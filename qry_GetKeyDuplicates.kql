@@ -1,0 +1,4 @@
+cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').Insights_Release_EV2_RolloutActions
+| summarize Duplicate_count = count() by RolloutID, LocationKey, RolloutAction, ActionStartedOn, ActionCompletedOn
+| where Duplicate_count > 1
+| summarize Duplicate_Keys = count(), Total_duplicates = sum(Duplicate_count), Ratio = sum(Duplicate_count) * 1.0/count()

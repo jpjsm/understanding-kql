@@ -1,0 +1,12 @@
+cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').ChangeEvent
+| where TIMESTAMP >= ago(180d)
+| summarize count() by bin(TIMESTAMP, 1d), ExternalSource, ExternalSourceName
+| order by ExternalSource asc, TIMESTAMP desc
+| extend PREV = prev(TIMESTAMP)
+| extend PREV = iff(isnull( PREV), bin(now(), 1d), PREV)
+| extend DeltaDays = datetime_diff("day", PREV, TIMESTAMP)
+| extend yyyymm = strcat(datetime_part('year', TIMESTAMP), substring(strcat('0', tostring(datetime_part('month', TIMESTAMP))), -2, 2))
+| summarize percentiles(DeltaDays, 25, 50, 75, 99)  by ExternalSource, ExternalSourceName, yyyymm
+| order by ExternalSourceName asc, yyyymm asc
+
+ 

@@ -1,0 +1,24 @@
+.create-or-alter function with (folder = "Test/jujofre", docstring = "N-Tile function", skipvalidation = "true") NTile(start:datetime=datetime(1900-01-01T00:00:00.0000000Z), end:datetime=datetime(1900-01-01T00:00:00.0000000Z), bucket_size:timespan=time(00:15:00), ntile:int=10) {
+// https://docs.microsoft.com/en-us/azure/data-explorer/kusto/query/columnifexists
+let root = ChangeEvent
+    | where TIMESTAMP >= iif(start==datetime(1900-01-01),ago(1d),start) and 
+            TIMESTAMP < iif(end==datetime(1900-01-01),now(),end)
+    | extend ActualElapsed = ActualEnd - ActualStart,
+             ScheduledElapsed = ScheduledEnd - ScheduledStart,
+             Elapsed = EndTime - StartTime
+    | sort by TIMESTAMP asc
+    | extend bucket_id = bin(TIMESTAMP, bucket_size)
+    | extend bucket_rownumber = row_number(0, prev(bucket_id) != bucket_id );
+let summary = root
+    | summarize bucket_size = count(), 
+                tile_count = count()/ntile, 
+                tile_reminder = count() % ntile
+            by bucket_id
+    | project bucket_id, bucket_size, tile_count, tile_reminder;
+root
+    | join kind = inner ( summary) on $left.bucket_id == $right.bucket_id
+    | extend tile_id = bucket_rownumber / tile_count
+    | summarize tile_size = count(), tile_first = min(TIMESTAMP), tile_last = max(TIMESTAMP), tile_avg = avg(TIMESTAMP), tile_stddev = todecimal(stdev(TIMESTAMP))
+            by bucket_id, tile_id
+    | project bucket_id, tile_id, tile_size, tile_first, tile_last, tile_avg, tile_stddev;
+} 

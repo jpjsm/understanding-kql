@@ -1,0 +1,17 @@
+let Duplicate_Ids = ChangeEventV2_old
+                    | summarize  Total_Rows = count(), TimeStamp = min(TimeStamp) by EventId, SourceSystem, ChangeId, ParentChangeId, ServiceId, PayloadId, LocationId, DeploymentTarget, ChangeTime
+                    | where Total_Rows > 1;
+let Unique_Ids = ChangeEventV2_old
+                    | summarize  Total_Rows = count(), TimeStamp = min(TimeStamp) by EventId, SourceSystem, ChangeId, ParentChangeId, ServiceId, PayloadId, LocationId, DeploymentTarget, ChangeTime
+                    | where Total_Rows == 1;  
+// Unique_Ids
+// | count;                    
+let DeDups = ChangeEventV2_old
+| join kind=innerunique (Duplicate_Ids) on EventId, SourceSystem, ChangeId, ParentChangeId, ServiceId, PayloadId, LocationId, DeploymentTarget, ChangeTime, TimeStamp
+| project-away EventId1, SourceSystem1, ChangeId1, ParentChangeId1, ServiceId1, PayloadId1, LocationId1, DeploymentTarget1, ChangeTime1, Total_Rows, TimeStamp1;
+// DeDups
+// | count;
+let Uniques =  ChangeEventV2_old
+| join kind=leftsemi  (Unique_Ids) on EventId, SourceSystem, ChangeId, ParentChangeId, ServiceId, PayloadId, LocationId, DeploymentTarget, ChangeTime, TimeStamp;
+Uniques
+| union DeDups

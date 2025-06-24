@@ -1,1 +1,1 @@
-# understanding-kql
+# /repos/jpjsm@github/understanding-kql

@@ -1,0 +1,8 @@
+.create-or-alter function with (folder = "Ev2", docstring = "Retrive TransformRolloutDetailsPerChangeEventSchemaV2 for specific datetime range", skipvalidation = "true") fn_Merge_TransformRolloutDetailsPerChangeEventSchemaV2_1() {
+        cluster('fcmdata').database('FCMKustoStore').Ev2_TransformRolloutDetails_EventSchemaV2_tmp_01
+        | extend ChangeTime = todatetime(ChangeTime)
+        | extend Latency = TimeStamp - ChangeTime
+        | join kind = leftanti 
+          (cluster('fcmdata').database('FCMKustoStore').Ev2_TransformRolloutDetails_EventSchemaV2) 
+          on EventId, SourceSystem, ChangeId, ParentChangeId,ServiceId, LocationId,DeploymentTarget, ChangeTime   
+} 

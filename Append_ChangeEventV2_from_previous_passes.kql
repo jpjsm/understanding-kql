@@ -1,0 +1,24 @@
+.append ChangeEventV2_003 <|
+    cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(25h), 1h), now())
+    | join kind = leftanti (cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').ChangeEventV2_003) on EventId, ChangeId, ParentChangeId
+    | extend PullId = tostring(tolong(now())), PayloadId_str = tostring(PayloadId), ReleaseId = "TBD"
+    | project-away PayloadId
+    | project-reorder TimeStamp, 
+                      SchemaVersion, 
+                      EventId, 
+                      ChangeDescription, 
+                      SourceSystem, 
+                      ChangeId, 
+                      ParentChangeId, 
+                      ReleaseId, 
+                      ServiceId, 
+                      PayloadSystem, 
+                      PayloadId_str, 
+                      LocationId, 
+                      DeploymentTarget, 
+                      DeploymentTargetType, 
+                      ChangeState, 
+                      ChangeTime, 
+                      ProjectedEndTime, 
+                      ChangeOwner, 
+                      PullId

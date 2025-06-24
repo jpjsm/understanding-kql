@@ -1,0 +1,15 @@
+let inscope_id = dynamic([ "f38ee5f4-d0ee-40a0-8e3f-633d9d9df8b6",
+            "8e6fa8b4-fc36-44a7-a0f2-795b81957344",
+            "9b546d4d-9930-4c38-b8ff-93fcd5aaa1ab",
+            "b196f682-8245-4486-9bb6-9a3cd2726dc6",
+            "59fe8ab9-6707-4b3c-afb0-f5ed4214b531"]);
+ChangeGuard_ServiceTree_Hierarchy_Snapshot
+| where DivisionId in (inscope_id)
+     or OrganizationId in (inscope_id)
+     or ServiceGroupId in (inscope_id)
+     or TeamGroupId in (inscope_id)
+     or ServiceId in (inscope_id)
+| distinct DivisionId, OrganizationId, ServiceGroupId, TeamGroupId, ServiceId, DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName
+| order by DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName
+
+

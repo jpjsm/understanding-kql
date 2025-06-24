@@ -1,0 +1,6 @@
+let numbers = datatable(number:long, English:string, Spanish:string)[1,"One","Uno",2,"Two","Dos",3,"Three","Tres"];
+let sqr = (n:real){n*n};
+range foo from 1 to 10 step 1
+| partition by foo (as Foo | extend SQR=sqr(toscalar(foo)))
+
+ 

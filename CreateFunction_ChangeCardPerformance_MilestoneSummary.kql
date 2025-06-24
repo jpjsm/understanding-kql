@@ -1,0 +1,53 @@
+.create-or-alter function with (folder = "ChangeCard", docstring = "Returns the past 2 semsters of ChangeCard performance by Milestone ", skipvalidation = "true") 
+ChangeCard_Performance_MilestoneSummary(){
+cluster('fcmdata').database('FCMKustoStore').ChangeCard_Performance_RawData
+| extend Semester = tostring(split(M," - ")[0])
+| extend CloudNet = iif(OwningTeamName startswith "CLOUDNET", 'CloudNet', 'Other Services')
+| summarize 
+    OKR_count = countif(OKRStatus == 'MeetsOKR'), 
+    OKR_pct = round(100.0 * countif(OKRStatus == 'MeetsOKR') / count()), 
+    InTop5_count = countif(RelevanceRank <= 5), 
+    InTop5_pct = round(100.0 * countif(RelevanceRank <= 5) / count()), 
+    Total_Cases = count() by Semester
+| extend Milestone = ""
+| sort by Semester asc
+| take 2
+| union (cluster('fcmdata').database('FCMKustoStore').ChangeCard_Performance_RawData
+| extend Semester = tostring(split(M," - ")[0])
+| extend CloudNet = iif(OwningTeamName startswith "CLOUDNET", 'CloudNet', 'Other Services')
+| summarize 
+    OKR_count = countif(OKRStatus == 'MeetsOKR'), 
+    OKR_pct = round(100.0 * countif(OKRStatus == 'MeetsOKR') / count()), 
+    InTop5_count = countif(RelevanceRank <= 5), 
+    InTop5_pct = round(100.0 * countif(RelevanceRank <= 5) / count()), 
+    Total_Cases = count() by Semester, CloudNet
+| extend Milestone = ""
+| sort by Semester asc, CloudNet
+| take 4)
+|union (cluster('fcmdata').database('FCMKustoStore').ChangeCard_Performance_RawData
+| extend Semester = tostring(split(M," - ")[0])
+| extend Milestone = tostring(split(M," - ")[1])
+| extend CloudNet = iif(OwningTeamName startswith "CLOUDNET", 'CloudNet', 'Other Services')
+| summarize 
+    OKR_count = countif(OKRStatus == 'MeetsOKR'), 
+    OKR_pct = round(100.0 * countif(OKRStatus == 'MeetsOKR') / count()), 
+    InTop5_count = countif(RelevanceRank <= 5), 
+    InTop5_pct = round(100.0 * countif(RelevanceRank <= 5) / count()), 
+    Total_Cases = count() by Semester, Milestone
+| sort by Semester asc, Milestone asc 
+| take 6)
+|union (cluster('fcmdata').database('FCMKustoStore').ChangeCard_Performance_RawData
+| extend Semester = tostring(split(M," - ")[0])
+| extend Milestone = tostring(split(M," - ")[1])
+| extend CloudNet = iif(OwningTeamName startswith "CLOUDNET", 'CloudNet', 'Other Services')
+| summarize 
+    OKR_count = countif(OKRStatus == 'MeetsOKR'), 
+    OKR_pct = round(100.0 * countif(OKRStatus == 'MeetsOKR') / count()), 
+    InTop5_count = countif(RelevanceRank <= 5), 
+    InTop5_pct = round(100.0 * countif(RelevanceRank <= 5) / count()), 
+    Total_Cases = count() by Semester, Milestone, CloudNet
+| sort by Semester asc, Milestone asc, CloudNet 
+| take 12)
+| sort by Semester asc, Milestone asc, CloudNet asc
+| project-reorder Semester, Milestone, CloudNet, OKR_count, OKR_pct, InTop5_count, InTop5_pct, Total_Cases
+}

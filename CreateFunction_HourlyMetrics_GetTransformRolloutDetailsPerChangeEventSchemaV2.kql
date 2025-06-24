@@ -1,0 +1,19 @@
+.create-or-alter function with (folder = "Ev2", docstring = "Metrics for \'Get TransformRolloutDetailsPerChangeEventSchemaV2\' job", skipvalidation = "true") 
+fn_HourlyMetrics_GetTransformRolloutDetailsPerChangeEventSchemaV2() { 
+    Ev2_TransformRolloutDetails_EventSchemaV2
+    | extend Hour_Id = bin(ChangeTime, 1h)
+    | summarize 
+        Avg_LatencyMinutes = avg(Latency) / 1m, 
+        Max_LatencyMinutes = max(Latency) / 1m, 
+        Min_LatencyMinutes = min(Latency) / 1m, 
+        Total_rows = count() by Hour_Id 
+    | extend PullDate = todatetime(Hour_Id)
+    | extend Year = getyear(PullDate)
+    | extend Month = getmonth(PullDate)
+    | extend Day = dayofmonth(PullDate)
+    | extend Weekday = toint(dayofweek(PullDate)/1d)
+    | extend WeekdayLabel = case (Weekday == 0, '0 - Sunday', Weekday == 1, '1 - Monday', Weekday == 2, '2 - Tuesday', Weekday == 3, '3 - Wednesday', Weekday == 4, '4 - Thursday', Weekday == 5, '5 - Friday', '6 - Saturday')
+    | extend Hour = hourofday(PullDate)
+    | extend Minute = datetime_part("minute", PullDate)
+    | sort by Hour_Id desc 
+} 

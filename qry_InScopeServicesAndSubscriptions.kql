@@ -1,0 +1,9 @@
+ChangeGuard_ServiceTree_Hierarchy_Snapshot
+| where DivisionId      in~ ("ff3d91bd-4fb6-4c8c-97f5-80e708f8c64d","c843e3ec-2f82-47f3-b157-fc1ca05ce6b9", "62708d8d-c741-4236-ba76-286a71daca34", "be4ea164-8632-421f-88d7-39377e9af49c")
+     or OrganizationId  in~ ("ff3d91bd-4fb6-4c8c-97f5-80e708f8c64d","c843e3ec-2f82-47f3-b157-fc1ca05ce6b9", "62708d8d-c741-4236-ba76-286a71daca34", "be4ea164-8632-421f-88d7-39377e9af49c")
+     or ServiceGroupId  in~ ("ff3d91bd-4fb6-4c8c-97f5-80e708f8c64d","c843e3ec-2f82-47f3-b157-fc1ca05ce6b9", "62708d8d-c741-4236-ba76-286a71daca34", "be4ea164-8632-421f-88d7-39377e9af49c")
+     or TeamGroupId     in~ ("ff3d91bd-4fb6-4c8c-97f5-80e708f8c64d","c843e3ec-2f82-47f3-b157-fc1ca05ce6b9", "62708d8d-c741-4236-ba76-286a71daca34", "be4ea164-8632-421f-88d7-39377e9af49c")
+     or ServiceId       in~ ("ff3d91bd-4fb6-4c8c-97f5-80e708f8c64d","c843e3ec-2f82-47f3-b157-fc1ca05ce6b9", "62708d8d-c741-4236-ba76-286a71daca34", "be4ea164-8632-421f-88d7-39377e9af49c")
+| where Environment =~ 'prod'     
+| project ServiceId, SubscriptionId, DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName, SubscriptionName, Environment
+| sort by DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName, SubscriptionName

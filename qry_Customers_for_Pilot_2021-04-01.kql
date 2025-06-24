@@ -1,0 +1,4 @@
+// Customers for Pilot 2021-04-01
+cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').ChangeGuard_ServiceTree_Hierarchy_Snapshot
+| where ServiceId in ('df36aee8-c644-400b-a0ab-fd0f1191211d', 'a0a46d95-77ef-4cb4-a6d8-6aa5a288c1db')
+    and SubscriptionId in ('29f60e0b-544c-4885-8307-a816db6f22f8', '83ae0615-6961-4cba-a1cb-a3a2759ae2a3')    

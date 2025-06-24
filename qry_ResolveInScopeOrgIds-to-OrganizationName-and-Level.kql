@@ -1,0 +1,39 @@
+let inScopeIds = datatable (id:string)[
+    "f38ee5f4-d0ee-40a0-8e3f-633d9d9df8b6", 
+    "8e6fa8b4-fc36-44a7-a0f2-795b81957344", 
+    "9b546d4d-9930-4c38-b8ff-93fcd5aaa1ab", 
+    "b196f682-8245-4486-9bb6-9a3cd2726dc6", 
+    "59fe8ab9-6707-4b3c-afb0-f5ed4214b531", 
+    "08e977f7-b4dc-41f3-8d69-f6abc4ecbdae"
+];
+let divisions = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+| join kind = inner (inScopeIds) on $left.DivisionId == $right.id
+| extend level = 'Division'
+| distinct level, DivisionName, id
+| project level, Name = DivisionName, id;
+let organizations = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+| join kind = inner (inScopeIds) on $left.OrganizationId == $right.id
+| extend level = 'Organization'
+| distinct level, OrganizationName, id
+| project level, Name = OrganizationName, id;
+let serviceGroups = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+| join kind = inner (inScopeIds) on $left.ServiceGroupId == $right.id
+| extend level = 'ServiceGroup'
+| distinct level, ServiceGroupName, id
+| project level, Name = ServiceGroupName, id;
+let teamGroups = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+| join kind = inner (inScopeIds) on $left.TeamGroupId == $right.id
+| extend level = 'TeamGroup'
+| distinct level, TeamGroupName, id
+| project level, Name = TeamGroupName, id;
+let services = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+| join kind = inner (inScopeIds) on $left.ServiceId == $right.id
+| extend level = 'Service'
+| distinct level, ServiceName, id
+| project level, Name = ServiceName, id;
+divisions
+| union organizations
+| union serviceGroups
+| union teamGroups
+| union services
+;

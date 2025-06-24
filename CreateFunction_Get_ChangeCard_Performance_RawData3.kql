@@ -1,0 +1,72 @@
+.create-or-alter function with (folder = "ChangeCard", docstring = "Update ChangeCard Performance Raw Data", skipvalidation = "true") Get_ChangeCard_Performance_RawData3() {
+        let icmdata = cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').IncidentXChangeRecordForChangeCardReadOnly
+            | join hint.strategy=broadcast  kind=inner(cluster('icmcluster.kusto.windows.net').database('IcMDataWarehouse').Incidents)
+                on $left.IncidentId==$right.IncidentId
+            | summarize min(MitigateDate),min(ImpactStartDate),min(Severity) by IncidentId,ChangeRecordId  
+            | project MitigateDate=min_MitigateDate,ImpactStartDate=min_ImpactStartDate,Severity=min_Severity,IncidentId,ChangeRecordId
+        ;
+        // icmdata | count;
+        let icmteamdata = cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').IncidentXChangeRecordForChangeCardReadOnly
+            | join hint.strategy=broadcast  kind=inner(cluster('icmcluster.kusto.windows.net').database('IcMDataWarehouse').Incidents)
+                on $left.IncidentId==$right.IncidentId
+            |summarize arg_max(SourceModifiedDate,*) by IncidentId
+            | project OwningTeamName,IncidentId
+        ;
+        // icmteamdata | count;
+        let incidentchangelog= IncidentChangeLogV3
+            | extend d=parse_json(PossibleCauses)
+            | mv-expand(todynamic(d.PossibleChanges.WhatsChangedList))
+            | extend d1=(parse_json(d_PossibleChanges_WhatsChangedList))
+            | extend ChangeRecordId=tolong(d1.ChangeRecordId),RelevanceRank=toint(d1.RelevanceRank)
+            | summarize min(TimeStamp),percentile(RelevanceRank,95) by IncidentId,ChangeRecordId
+            | project ChangeShownTime=min_TimeStamp,RelevanceRank=percentile_RelevanceRank_95,IncidentId,ChangeRecordId
+        ;
+        // incidentchangelog | count; 
+        let summary=icmdata
+        | join kind=inner (icmteamdata) on $left.IncidentId==$right.IncidentId
+        | join kind=inner (incidentchangelog) on $left.IncidentId==$right.IncidentId and $left.ChangeRecordId==$right.ChangeRecordId
+        ;
+        // summary | count;
+        summary
+        |where ImpactStartDate>datetime(2020-01-01)
+        |extend M = Get_AzureSemesterMilestone(ImpactStartDate)
+        |extend MinutesTakentoShowchange=datetime_diff('minute',coalesce(ChangeShownTime,ago(-1000d)),ImpactStartDate)
+        |extend MinutesTakentoMitigate=datetime_diff('minute',coalesce(MitigateDate,ago(-1000d)),ImpactStartDate)
+        // Before or After Mitigation
+        |extend BeforeorAfterMitigation = case(isempty(MitigateDate), 'NotMitigated', MinutesTakentoShowchange<MinutesTakentoMitigate,'BeforeMitigation','AfterMitigation')
+        // Meets OKR
+        |extend OKRStatus = case(BeforeorAfterMitigation == 'NotMitigated', iif(MinutesTakentoShowchange <= 60, 'MeetsOKR', 'NotMeetsOKR'),  RelevanceRank <= 5, iif( ChangeShownEvent == 'BeforeMitigation', 'MeetsOKR', 'NotMeetsOKR'), 'NotMeetsOKR')
+        // Difference in measures
+        |extend Differences = iif(BeforeorAfterMitigation != BeforeorAfterMitigation or OKRStatus != OKRStatus,'Y','')
+        // Simplify Time to Show
+        | extend Minutes2ShowChange = iif(MinutesTakentoShowchange <= 90, MinutesTakentoShowchange, int(null))
+        | extend Hours2ShowChange = iif(MinutesTakentoShowchange > 90 and MinutesTakentoShowchange < (60*12), toint(round(MinutesTakentoShowchange/60.0,0)), int(null))
+        | extend Days2ShowChange = iif( MinutesTakentoShowchange >= (60*12), round(MinutesTakentoShowchange/(60.0*24), 1), real(null))
+        | extend Time2ShowChange = case(isnotnull(Minutes2ShowChange), strcat(tostring(Minutes2ShowChange), ' mins')
+                                , isnotnull(Hours2ShowChange), strcat(tostring(Hours2ShowChange), ' hrs')
+                                , strcat(tostring(Days2ShowChange), ' days'))
+        | extend Minutes2Mitigate = iif(MinutesTakentoMitigate <= 90, MinutesTakentoMitigate, int(null))
+        | extend Hours2Mitigate = iif(MinutesTakentoMitigate > 90 and MinutesTakentoMitigate < (60*12), toint(round(MinutesTakentoMitigate/60.0,0)), int(null))
+        | extend Days2Mitigate = iif( MinutesTakentoMitigate >= (60*12), round(MinutesTakentoMitigate/(60.0*24), 1), real(null))
+        | extend Time2Mitigate = case(isnotnull(Minutes2Mitigate), strcat(tostring(Minutes2Mitigate), ' mins')
+                                , isnotnull(Hours2Mitigate), strcat(tostring(Hours2Mitigate), ' hrs')
+                                , strcat(tostring(Days2Mitigate), ' days'))
+        |project  IncidentId
+                 ,M
+                 ,ImpactStartDate
+                 ,OwningTeamName
+                 ,ChangeRecordId
+                 ,RelevanceRank
+                 ,MinutesTakentoShowchange
+                 ,Time2ShowChange
+                 ,MinutesTakentoMitigate
+                 ,Time2Mitigate
+//                  ,BeforeorAfterMitigation
+//                  ,OKRStatus
+//                  ,Differences
+                 ,BeforeorAfterMitigation
+                 ,OKRStatus
+                 ,ChangeShownTime
+                 ,MitigateDate
+        |order by ImpactStartDate,OwningTeamName
+    } 

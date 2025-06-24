@@ -1,0 +1,15 @@
+ChangeGuard_ExceptionRequest
+| where Status matches regex '(?i)PendingApproval'
+| extend Approvers = toupper(Approvers)
+| extend ExceptionRequestType = iif(isempty(DeploymentOfOrigin), 'ProActive', 'ReActive')
+| distinct ExceptionRequestId, Approvers, ExceptionRequestType
+| extend approver = split(Approvers, '|')
+| mv-expand approver to typeof(string)
+| project-away Approvers
+| extend approver = split(approver, ',')
+| mv-expand approver to typeof(string)
+| where approver matches regex '@'
+| summarize Email_Count = count() by approver, ExceptionRequestType
+| evaluate pivot(ExceptionRequestType, sum(Email_Count))
+| extend TotalEmails = ProActive + ReActive
+| order by TotalEmails desc

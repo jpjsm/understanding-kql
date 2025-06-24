@@ -1,0 +1,5 @@
+cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').InsightsReleaseOneBranch
+| summarize New_rows = count() by TimeStamp, PullId
+| sort by TimeStamp asc, PullId asc 
+| extend Cumulative_row_count = row_cumsum(New_rows)
+

@@ -1,0 +1,16 @@
+.create-or-alter function 
+   with (folder = "ChangeEventV2", docstring = "Get basic update information of ChangeEventV2 data", skipvalidation = "true") 
+   Dashboard_ChangeEventV2_updates(since:datetime=datetime(2020-05-15T00:01:03.0604226Z)) { 
+    ChangeEventV2
+    | summarize Rows_Retrieved = count(), 
+                Oldest_ChangeTime = min(ChangeTime), 
+                Newest_ChangeTime = max(ChangeTime),
+                Oldest_TimeStamp = min(TimeStamp),
+                Newest_TimeStamp = max(TimeStamp)
+                by PullId
+    | extend PullId_datetime = todatetime(tolong(PullId))
+    | sort by PullId asc
+    | extend TimeSpan_in_between = totimespan(tolong(PullId) - tolong(prev(PullId,1, datetime(637250976630604226))))
+    | project-away PullId 
+    | project-reorder PullId_datetime, TimeSpan_in_between, Rows_Retrieved, Oldest_ChangeTime, Newest_ChangeTime
+}  

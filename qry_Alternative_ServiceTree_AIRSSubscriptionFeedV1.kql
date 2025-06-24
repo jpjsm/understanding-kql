@@ -1,0 +1,37 @@
+let Genevareference_ServiceTree_AIRSSubscriptionFeedV1 = cluster('genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot 
+                                                | join kind=leftouter (cluster('genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_AzureSubscription_Snapshot ) on $left.ServiceId == $right.ServiceId
+                                                | project 
+                                                    DivisionOid = DivisionId
+                                                  , DivisionName
+                                                  , OrganizationOid = OrganizationId
+                                                  , OrganizationName
+                                                  , ServiceGroupOid = ServiceGroupId
+                                                  , ServiceGroupName
+                                                  , Discriminator = Level
+                                                  , ServiceOid = ServiceId
+                                                  , ServiceName
+                                                  , MicroServiceOid = MicroServiceId
+                                                  , MicroServiceName
+                                                  , ComponentOid = ComponentId
+                                                  , ComponentName
+                                                  , SubscriptionId
+                                                  , EntityState = 'N/A'
+                                                  , Environment
+                                                  , IsHostedOnBehalfOf
+                                                  , CloudName = AzureCloud
+                                                  , Notes
+                                                  , SubscriptionName
+                                                  , TeamGroupOid = TeamGroupId
+                                                  , TeamGroupName
+                                                | extend Genevareferenc = 'Y';
+let Unmatched_Lens = cluster('lens').database('Shared').ServiceTree_AIRSSubscriptionFeedV1 
+| extend Lens = 'Y'
+| join kind=leftanti  (Genevareference_ServiceTree_AIRSSubscriptionFeedV1) on DivisionOid, OrganizationOid, ServiceGroupOid, ServiceOid, SubscriptionId;
+let Unmatched_GenevaReference = cluster('lens').database('Shared').ServiceTree_AIRSSubscriptionFeedV1 
+| extend Lens = 'Y'
+| join kind=rightanti   (Genevareference_ServiceTree_AIRSSubscriptionFeedV1) on DivisionOid, OrganizationOid, ServiceGroupOid, ServiceOid, SubscriptionId;
+Unmatched_Lens;
+Unmatched_GenevaReference;
+let Unmatched_Lens_Count = Unmatched_Lens|count;
+let Unmatched_GenevaReference_Count = Unmatched_GenevaReference|count;
+Unmatched_Lens_Count | union Unmatched_GenevaReference_Count;

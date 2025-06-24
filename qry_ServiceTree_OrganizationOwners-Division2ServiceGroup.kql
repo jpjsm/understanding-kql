@@ -1,0 +1,27 @@
+let divisions = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_OrganizationCommonMetadata_Snapshot
+    | where OrganizationLevel =~ 'Division'
+    | extend DivisionOwner = BusinessOwner
+    | extend DivisionId = OrganizationId
+    | project-away ChangeVersion, BusinessOwner, OrganizationId
+    | project DivisionId, OrganizationName, OrganizationLevel, DivisionOwner;
+let organizations = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_OrganizationCommonMetadata_Snapshot
+    | where OrganizationLevel =~ 'Organization'
+    | extend OrganizationOwner = BusinessOwner
+    | project-away ChangeVersion, BusinessOwner
+    | project OrganizationId, OrganizationName, OrganizationLevel, OrganizationOwner;
+let servicegroups = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_OrganizationCommonMetadata_Snapshot
+    | where OrganizationLevel =~ 'ServiceGroup'
+    | extend ServiceGroupOwner = BusinessOwner
+    | extend ServiceGroupId = OrganizationId
+    | project-away ChangeVersion, BusinessOwner, OrganizationId
+    | project ServiceGroupId, OrganizationName, OrganizationLevel, ServiceGroupOwner;
+cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+| where Level =~ 'Division' or Level =~ 'Organization' or Level =~ 'ServiceGroup'
+| join kind = inner divisions on DivisionId
+| join kind = inner organizations on OrganizationId
+| join kind = inner servicegroups on ServiceGroupId
+| project-away ChangeVersion, Id, Level, Name, TeamGroupName, TeamGroupId, ServiceName, ServiceId, MicroServiceName, MicroServiceId, ComponentName, ComponentId, Description, Tags, Created, CreatedBy, Modified, ModifiedBy, DivisionId1, OrganizationName1, OrganizationLevel, OrganizationId1, OrganizationName2, OrganizationLevel1, ServiceGroupId1, OrganizationName3, OrganizationLevel2
+| project-reorder DivisionId, OrganizationId, ServiceGroupId, DivisionName, DivisionOwner, OrganizationName, OrganizationOwner, ServiceGroupName, ServiceGroupOwner
+| extend Approvers =iif(OrganizationOwner == ServiceGroupOwner, OrganizationOwner, strcat(OrganizationOwner, ';',ServiceGroupOwner))
+| project DivisionId, OrganizationId, ServiceGroupId, DivisionName, OrganizationName, ServiceGroupName, Approvers
+| order by DivisionName, OrganizationName, ServiceGroupName

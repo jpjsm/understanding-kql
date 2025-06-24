@@ -1,0 +1,7 @@
+.create-or-alter function with (folder = "ChangeCard", docstring = "Returns the latest ingestion time for IncidentXChangeRecordForChangeCardReadOnly", skipvalidation = "true") 
+    Get_IncidentXChangeRecordForChangeCardReadOnly_IngestionTimes() {
+    IncidentXChangeRecordForChangeCardReadOnly
+    | extend ingestionTime = bin(ingestion_time(), 1h)
+    | summarize Total_Rows = count() by ingestionTime
+    | sort by ingestionTime desc
+}

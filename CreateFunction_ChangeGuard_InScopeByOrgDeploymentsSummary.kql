@@ -1,0 +1,102 @@
+.create-or-alter function 
+ChangeGuard_InScopeByOrgDeploymentsSummary(EventStartDate:datetime, EventEndDate:datetime, _InScopeOrgIds:dynamic) 
+{ 
+    let InScopeIds = datatable (InScopeId: string)[''] | extend _InScopeOrgId = _InScopeOrgIds | mv-expand _InScopeOrgId to typeof(string) | extend InScopeId = _InScopeOrgId | project-away _InScopeOrgId;
+    let divisions = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+        | join kind = inner (InScopeIds) on $left.DivisionId == $right.InScopeId
+        | extend level = '1.- Division'
+        | distinct level, DivisionName, InScopeId
+        | project level, Name = DivisionName, InScopeId, NameLevel = strcat(DivisionName, ' [', level, ']');
+    let organizations = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+        | join kind = inner (InScopeIds) on $left.OrganizationId == $right.InScopeId
+        | extend level = '2.- Organization'
+        | distinct level, OrganizationName, InScopeId
+        | project level, Name = OrganizationName, InScopeId, NameLevel = strcat(OrganizationName, ' [', level, ']');
+    let serviceGroups = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+        | join kind = inner (InScopeIds) on $left.ServiceGroupId == $right.InScopeId
+        | extend level = '3.- ServiceGroup'
+        | distinct level, ServiceGroupName, InScopeId
+        | project level, Name = ServiceGroupName, InScopeId, NameLevel = strcat(ServiceGroupName, ' [', level, ']');
+    let teamGroups = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+        | join kind = inner (InScopeIds) on $left.TeamGroupId == $right.InScopeId
+        | extend level = '4.- TeamGroup'
+        | distinct level, TeamGroupName, InScopeId
+        | project level, Name = TeamGroupName, InScopeId, NameLevel = strcat(TeamGroupName, ' [', level, ']');
+    let services = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+        | join kind = inner (InScopeIds) on $left.ServiceId == $right.InScopeId
+        | extend level = '5.- Service'
+        | distinct level, ServiceName, InScopeId
+        | project level, Name = ServiceName, InScopeId, NameLevel = strcat(ServiceName, ' [', level, ']');
+    let ChangeGuard_Ev2_DeploymentChecks_InEventScope = ChangeGuard_Ev2_DeploymentChecks
+        | where ChangeAssessmentTimeStamp between (EventStartDate .. EventEndDate);
+    let InScopeDeploymentsSummary = ChangeGuard_Ev2_DeploymentChecks_InEventScope
+        | extend inscope = isnotempty(EventsEffective)
+        | extend blocked = iif(inscope, iif(AllowedToDeploy, false, true), false)
+        | extend revoked = isnotempty(EventsEffective) and isnotempty(ExceptionsReviewed) and not(AllowedToDeploy)
+        | summarize DeploymentsInScope = countif(inscope)
+            , DeploymentsNotInScope = countif(inscope == false)
+            , DeploymentsTotal = count() 
+            , DeploymentsBlocked = countif(blocked)
+            , DeploymentsRejected = countif(revoked)
+            by ChangeAssessmentId
+        | where DeploymentsInScope > 0
+        | summarize TotalRolloutsWithDeploymentsInScope = count()
+            , TotalDeployments = sum(DeploymentsTotal)
+            , TotalDeploymentsNotInScope = sum(DeploymentsNotInScope)
+            , TotalDeploymentsInScope = sum(DeploymentsInScope)
+            , TotalDeploymentsBlocked = sum(DeploymentsBlocked)
+            , TotalDeploymentsRejected = sum(DeploymentsRejected)
+            , PctDeploymentsBlocked = toint(10000.0 * toreal(sum(DeploymentsBlocked)) / toreal(sum(DeploymentsInScope))) / 100.0;
+    let InScopeByOrgDeploymentsSummary = ChangeGuard_Ev2_DeploymentChecks_InEventScope
+        | extend inscope = isnotempty(EventsEffective)
+        | extend blocked = iif(inscope, iif(AllowedToDeploy, false, true), false)
+        | extend revoked = isnotempty(EventsEffective) and isnotempty(ExceptionsReviewed) and not(AllowedToDeploy)
+        | join kind = inner (ChangeGuard_ServiceTree_Hierarchy_Snapshot) on SubscriptionId
+        | project-keep ChangeAssessmentId, inscope, blocked, revoked, EventsEffective, AllowedToDeploy, ExceptionsReviewed, SubscriptionId, DivisionId, OrganizationId, ServiceGroupId, TeamGroupId, ServiceId1
+        | extend ServiceId = ServiceId1
+        | project-away ServiceId1
+        | join kind = leftouter (divisions) on $left.DivisionId == $right.InScopeId
+        | project-keep ChangeAssessmentId, inscope, blocked, revoked, EventsEffective, AllowedToDeploy, ExceptionsReviewed, SubscriptionId, DivisionId, OrganizationId, ServiceGroupId, TeamGroupId, ServiceId, level, Name, NameLevel
+        | join kind = leftouter (organizations) on $left.OrganizationId == $right.InScopeId
+        | extend level = iif(isnotempty(level1), level1, level)
+        | extend Name = iif(isnotempty(Name1), Name1, Name)
+        | extend NameLevel = iif(isnotempty(NameLevel1), NameLevel1, NameLevel)
+        | project-away level1, Name1, NameLevel1
+        | join kind = leftouter (serviceGroups) on $left.ServiceGroupId == $right.InScopeId
+        | extend level = iif(isnotempty(level1), level1, level)
+        | extend Name = iif(isnotempty(Name1), Name1, Name)
+        | extend NameLevel = iif(isnotempty(NameLevel1), NameLevel1, NameLevel)
+        | project-away level1, Name1, NameLevel1
+        | join kind = leftouter (teamGroups) on $left.TeamGroupId == $right.InScopeId
+        | extend level = iif(isnotempty(level1), level1, level)
+        | extend Name = iif(isnotempty(Name1), Name1, Name)
+        | extend NameLevel = iif(isnotempty(NameLevel1), NameLevel1, NameLevel)
+        | project-away level1, Name1, NameLevel1
+        | join kind = leftouter (services) on $left.ServiceId == $right.InScopeId
+        | extend level = iif(isnotempty(level1), level1, level)
+        | extend Name = iif(isnotempty(Name1), Name1, Name)
+        | extend NameLevel = iif(isnotempty(NameLevel1), NameLevel1, NameLevel)
+        | project-away level1, Name1, NameLevel1
+        | summarize DeploymentsInScope = countif(inscope)
+            , DeploymentsNotInScope = countif(inscope == false)
+            , DeploymentsTotal = count() 
+            , DeploymentsBlocked = countif(blocked)
+            , DeploymentsRejected = countif(revoked)
+            by ChangeAssessmentId, level, Name, NameLevel
+        | where DeploymentsInScope > 0
+        | summarize TotalRolloutsWithDeploymentsInScope = count()
+            , TotalDeployments = sum(DeploymentsTotal)
+            , TotalDeploymentsNotInScope = sum(DeploymentsNotInScope)
+            , TotalDeploymentsInScope = sum(DeploymentsInScope)
+            , TotalDeploymentsBlocked = sum(DeploymentsBlocked)
+            , TotalDeploymentsRejected = sum(DeploymentsRejected)
+            , PctDeploymentsBlocked = toint(10000.0 * toreal(sum(DeploymentsBlocked)) / toreal(sum(DeploymentsInScope))) / 100.0
+            by level, Name;
+    InScopeByOrgDeploymentsSummary
+    | order by level asc, Name asc
+    | union (
+        InScopeDeploymentsSummary
+        | extend level = '(All)'
+        | extend Name = '(all)'
+        )
+}

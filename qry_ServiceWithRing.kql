@@ -1,0 +1,14 @@
+// DataStudio_ServiceTree_ServiceCommonMetadata_Snapshot
+// | getschema ;
+// 
+let ServiceRing = cluster('datastudiostreaming').database('Shared').DataStudio_ServiceTree_ServiceMetadata_Snapshot
+| where Type =~ "ServiceRing" 
+| extend Ring = tostring(parse_json(Value).ServiceRing)
+| extend ServiceId = tolower(ServiceId)
+| distinct ServiceId, Ring;
+ChangeGuard_ServiceTree_Hierarchy_Snapshot
+| distinct ServiceId, ServiceName
+| join kind = leftouter  (ServiceRing) on ServiceId
+| extend Ring = iif(isempty(Ring), 'No Ring', Ring)
+| summarize RingCount = count() by Ring
+| order by Ring asc 

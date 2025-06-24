@@ -1,0 +1,3 @@
+.append SDP <|
+Pull_RolloutDetailAnalyticsEvent(now() - 4h, now())
+| join kind=leftanti (SDP) on RolloutID, env_cv, Location, Subscription

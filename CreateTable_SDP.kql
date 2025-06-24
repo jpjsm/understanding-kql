@@ -1,0 +1,10 @@
+.create table SDP ( 
+    RolloutID:string, 
+    env_cv:string, 
+    Location:string, 
+    Subscription:string, 
+    ResourceOperations:string, 
+    RolloutAction:string, 
+    ActionStartedOn:string, 
+    ActionCompletedOn:string
+) with ( docstring = "Proof of Concept table to collect SDP data" );

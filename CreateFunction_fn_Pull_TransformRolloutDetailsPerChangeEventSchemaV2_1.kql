@@ -1,0 +1,5 @@
+.create-or-alter function with (folder = "Ev2", docstring = "Retrive TransformRolloutDetailsPerChangeEventSchemaV2 for specific datetime range", skipvalidation = "true") 
+ fn_Get_TransformRolloutDetailsPerChangeEventSchemaV2_1(StartRollout:datetime , EndRollout:datetime ) {
+        cluster('admcluster.kusto.windows.net').database('ADMDatabase').TransformRolloutDetailsPerChangeEventSchemaV2(StartRollout, EndRollout)
+        | extend PullId = tolong(ingestion_time())
+} 

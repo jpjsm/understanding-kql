@@ -1,0 +1,5 @@
+cluster('datastudiostreaming.kusto.windows.net').database('AzureGraph').PhysicalAsset_DCMTRegions
+| project Id, Name, FriendlyName, ShortID, AG_RegionId,DCMT_Id, ARMRegionName 
+| extend RegionName = parse_json(strcat('["',Name, '","', FriendlyName, '","', ShortID, '","', AG_RegionId, '","', DCMT_Id, '","', ARMRegionName, '"]'))
+| mv-expand RegionName to typeof(string)
+| distinct Id, RegionName

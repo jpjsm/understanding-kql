@@ -1,0 +1,11 @@
+cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').Get_ChangeCard_Performance_RawData2
+| extend Minutes2Show = iif(MinutesTakentoShowchange <= 90, MinutesTakentoShowchange, int(null))
+| extend Hours2Show = iif(MinutesTakentoShowchange > 90 and MinutesTakentoShowchange < (60*12), toint(round(MinutesTakentoShowchange/60.0,0)), int(null))
+| extend Days2Show = iif( MinutesTakentoShowchange >= (60*12), round(MinutesTakentoShowchange/(60.0*24), 1), real(null))
+| extend Time2Show = case(isnotnull(Minutes2Show), strcat(tostring(Minutes2Show), ' mins')
+                        , isnotnull(Hours2Show), strcat(tostring(Hours2Show), ' hrs')
+                        , strcat(tostring(Days2Show), ' days'))
+| where MinutesTakentoShowchange > 60
+    and Meets_OKR == 'MeetsOKR'
+| sort by MinutesTakentoShowchange desc
+| project IncidentId, M, ImpactStartDate, OwningTeamName, ChangeRecordId, RelevanceRank,Time2Show, ChangeShownEvent,  Meets_OKR

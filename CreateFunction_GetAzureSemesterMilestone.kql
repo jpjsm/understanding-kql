@@ -1,0 +1,14 @@
+.create-or-alter function with (folder = "Shared", docstring = "Returns an Azure Semester Milestone for a given date; Valid formats: cyhm --> Calendar Year Semester Milestone, fyhm --> Fiscal Year Semester Milestone, em --> Element_Symbol Milestone, EM --> Element_Name Milestone, <anything else> --> Milestone", skipvalidation = "true") 
+ Get_AzureSemesterMilestone(D:datetime  , _format:string="EM") { 
+    toscalar(cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').AzureSemesters
+    | where D between (SemesterBegin .. SemesterEnd)
+    | extend m = getmonth(D) % 6
+    | extend m = ((iif(m == 0, 6, m) - 1)/2) + 1
+    | extend answer = case(
+        tolower(_format) == 'cyhm', strcat(CYH, ' - M', m), 
+        tolower(_format) == 'fyhm', strcat(FYH, ' - M', m), 
+        _format == 'em', strcat(Symbol, ' - m', m), 
+        _format == 'EM', strcat(ElementName, ' - M', m), 
+        strcat("M",m))
+    | project answer)
+} 

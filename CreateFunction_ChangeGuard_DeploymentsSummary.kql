@@ -1,0 +1,25 @@
+.create-or-alter function with (skipvalidation = "true") ChangeGuard_DeploymentsSummary(EventStartDate:datetime, EventEndDate:datetime) { 
+    let ChangeGuard_Ev2_DeploymentChecks_InEventScope = ChangeGuard_Ev2_DeploymentChecks
+        | where ChangeAssessmentTimeStamp between (EventStartDate .. EventEndDate);
+    ChangeGuard_Ev2_DeploymentChecks_InEventScope
+        | extend inscope = isnotempty(EventsEffective)
+        | extend blocked = iif(inscope, iif(AllowedToDeploy, false, true), false)
+        | extend revoked = isnotempty(EventsEffective) and isnotempty(ExceptionsReviewed) and not(AllowedToDeploy)
+        | summarize DeploymentsInScope = countif(inscope)
+            , DeploymentsNotInScope = countif(inscope == false)
+            , DeploymentsTotal = count() 
+            , DeploymentsBlocked = countif(blocked)
+            , DeploymentsRejected = countif(revoked)
+            by ChangeAssessmentId
+        | summarize 
+              TotalRollouts = count()
+            , TotalRolloutsWithDeploymentsInScope = countif(DeploymentsInScope > 0)
+            , TotalDeployments = sum(DeploymentsTotal)
+            , TotalDeploymentsForRolloutsNotInScope = sumif(DeploymentsNotInScope, DeploymentsInScope == 0)
+            , TotalDeploymentsForInScopeRollouts = sumif(DeploymentsTotal, DeploymentsInScope > 0)
+            , TotalDeploymentsNotInScopeForInScopeRollouts = sumif(DeploymentsNotInScope, DeploymentsInScope > 0)
+            , TotalDeploymentsInScope = sum(DeploymentsInScope)
+            , TotalDeploymentsBlocked = sum(DeploymentsBlocked)
+            , TotalDeploymentsRejected = sum(DeploymentsRejected)
+            , PctDeploymentsBlocked = toint(10000.0 * toreal(sum(DeploymentsBlocked)) / toreal(sum(DeploymentsInScope))) / 100.0;
+} 

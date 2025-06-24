@@ -1,0 +1,27 @@
+let ServiceTree_AzureSubscriptionHierarchy = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+| join kind = inner (cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_AzureSubscription_Snapshot) on ServiceId;
+let ServiceTree_AzureServiceNOSubscription = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+| join kind = leftanti (cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_AzureSubscription_Snapshot) on ServiceId;
+let ServiceTree_OrphanedSubscription = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+| join kind = rightanti (cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_AzureSubscription_Snapshot) on ServiceId;
+ServiceTree_AzureSubscriptionHierarchy
+| summarize Total =count()
+| extend View = 'ServiceTree_AzureSubscriptionHierarchy'
+|project View, Total
+|union(
+ServiceTree_AzureServiceNOSubscription
+| summarize Total =count()
+| extend View = 'ServiceTree_AzureServiceNOSubscription'
+|project View, Total
+)
+|union(
+ServiceTree_OrphanedSubscription
+| summarize Total =count()
+| extend View = 'ServiceTree_OrphanedSubscription'
+|project View, Total
+);
+ServiceTree_OrphanedSubscription
+| distinct ServiceId, ServiceName;
+ServiceTree_OrphanedSubscription
+| project ServiceId, ServiceName, SubscriptionId, SubscriptionName, ServiceLevel
+| sort by ServiceLevel desc, ServiceName asc, SubscriptionName asc;

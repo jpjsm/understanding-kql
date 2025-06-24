@@ -1,0 +1,80 @@
+let incidentchanges=datatable (IncidentId:long, ChangeRecordId:long)[
+    186363250,900000122456620,
+    185460117,600000196422201,
+    186172168,300000158698513,
+    186370002,900000124355468,
+    186172364,900000123488991,
+    183837530,600000195516665,
+    181551693,600000194459150,
+    182362612,900000116470903,
+    181144345,600000195031233,
+    180526688,96369860,
+    180526688,96369971,
+    178331870,300000119896549,
+    181045141,900000114061726,
+    179987617,900000110592430,
+    179121453,900000109517027,
+    180218672,600000195951945,
+    178730162,600000195810645,
+    178324985,600000195748980,
+    177477089,600000195667457,
+    178437164,900000097100540,
+    178258376,600000195378501,
+    177579551,600000195702594,
+    176311824,900000092607121,
+    176233992,600000195591015,
+    176723269,900000089167242,
+    176331617,900000094787786,
+    173340744,900000081245160,
+    173340744,900000081634302,
+    173667630,900000084334531,
+    172096539,300000088530880,
+    172857042,900000084123013,
+    172855314,900000083699433,
+    169168242,600000195072667,
+    171373490,900000079366798,
+    171130457,900000078933474,
+    171131198,900000078933474,
+    170967362,900000072150378,
+    170964316,900000072150378,
+    170690957,900000076381570,
+    170685307,900000072150284,
+    170660433,900000072150378,
+    170654864,900000072150284,
+    163432307,600000194711848
+];
+let icmdata=incidentchanges
+    | join hint.strategy=broadcast  
+        kind=inner
+        (cluster('icmcluster.kusto.windows.net').database('IcMDataWarehouse').Incidents) on $left.IncidentId==$right.IncidentId
+    | summarize min(MitigateDate),min(ImpactStartDate),min(Severity) by IncidentId,ChangeRecordId
+    | project MitigateDate=min_MitigateDate,ImpactStartDate=min_ImpactStartDate,Severity=min_Severity,IncidentId,ChangeRecordId;
+let icmteamdata=incidentchanges
+    | join hint.strategy=broadcast  
+        kind=inner
+        (cluster('icmcluster.kusto.windows.net').database('IcMDataWarehouse').Incidents) on $left.IncidentId==$right.IncidentId
+    | summarize arg_max(SourceModifiedDate,*) by IncidentId
+    | project OwningTeamName,IncidentId;
+let incidentchangelog=IncidentChangeLogV3
+    | extend d=parse_json(PossibleCauses)
+    | mv-expand(todynamic(d.PossibleChanges.WhatsChangedList))
+    | extend d1=(parse_json(d_PossibleChanges_WhatsChangedList))
+    | extend ChangeRecordId=tolong(d1.ChangeRecordId),RelevanceRank=toint(d1.RelevanceRank)
+    | summarize min(TimeStamp),percentile(RelevanceRank,95) by IncidentId,ChangeRecordId
+    | project ChangeShownTime=min_TimeStamp,RelevanceRank=percentile_RelevanceRank_95,IncidentId,ChangeRecordId;
+let summary=icmdata
+    | join kind=inner (incidentchangelog) on IncidentId and ChangeRecordId
+    | join kind=inner (icmteamdata) on IncidentId;
+summary
+    | where ImpactStartDate>datetime(2020-01-01)
+    | project IncidentId,
+              ImpactStartDate,
+              OwningTeamName,
+              ChangeRecordId,
+              RelevanceRank, 
+              TimeTakentoShowchange=datetime_diff('minute',ChangeShownTime,ImpactStartDate),
+              TimeTakentoMitigate=datetime_diff('minute',MitigateDate,ImpactStartDate),
+              BeforeorAfterMitigation=case(MitigateDate<ChangeShownTime or  isempty(MitigateDate),'AfterMitigation','BeforeMitigation'),
+              OKRStatus=case((MitigateDate>ChangeShownTime or isempty(MitigateDate))and RelevanceRank<=5,'MeetsOKR','NotMeetsOKR')
+    | order by ImpactStartDate, OwningTeamName
+

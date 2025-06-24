@@ -1,0 +1,10 @@
+// DataStudio_ServiceTree_ServiceCommonMetadata_Snapshot
+// | getschema ;
+// 
+let CriticalServicesClassification = cluster('datastudiostreaming').database('Shared').DataStudio_ServiceTree_ServiceMetadata_Snapshot
+| where Type =~ "CriticalServicesClassification" 
+| extend SubService = tostring(parse_json(Value).SubService)
+| extend CriticalityCriteria = tostring(parse_json(Value).CriticalityCriteria)
+| project ChangeVersion, Id, ServiceId, ServiceLevel, ServiceName, Type, SubService, CriticalityCriteria, IsComplex, AzureCloud, Created, CreatedBy, Modified, ModifiedBy;
+ChangeGuard_ServiceTree_Hierarchy_Snapshot
+| join kind = leftouter  (CriticalServicesClassification|project ServiceId, ServiceLevel, ServiceName, Type, SubService, CriticalityCriteria, IsComplex, AzureCloud) on ServiceId

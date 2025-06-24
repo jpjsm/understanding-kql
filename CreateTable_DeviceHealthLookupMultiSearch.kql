@@ -1,0 +1,23 @@
+.create table DeviceHealthLookupMultiSearch(
+    TIMESTAMP : datetime,
+    DeviceName : string,
+    Status : string,
+    FailureReason : string,
+    FailureSignal : string,
+    HealthCategory : string,
+    Health : string,
+    Count_or_Percentage : string,
+    endDeviceIP : string,
+    Confidence : long,
+    Persistence_1h : real,
+    Cluster : string,
+    Group : string,
+    CloudType : string,
+    Datacenter : string,
+    NgsDeviceType : string,
+    AzureDeviceType : string,
+    DeploymentType : string,
+    Regions : string,
+    PullID : datetime,
+    Latency : timespan 
+)

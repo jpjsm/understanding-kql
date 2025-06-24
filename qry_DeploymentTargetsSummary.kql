@@ -1,0 +1,7 @@
+ChangeGuard_Ev2_DeploymentChecks
+| summarize TargetsAllowedToDeploy = countif(AllowedToDeploy), TargetsBlocked = countif(AllowedToDeploy == false), TotalTargets = count()
+| extend ChangeAssessmentId = 'Total Targets'
+| union (ChangeGuard_Ev2_DeploymentChecks
+| summarize TargetsAllowedToDeploy = countif(AllowedToDeploy), TargetsBlocked = countif(AllowedToDeploy == false), TotalTargets = count() by ChangeAssessmentId)
+| project ChangeAssessmentId, TargetsAllowedToDeploy, TargetsBlocked, TotalTargets
+| order by TotalTargets desc 

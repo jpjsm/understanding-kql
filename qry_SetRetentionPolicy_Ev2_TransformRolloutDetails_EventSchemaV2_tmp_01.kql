@@ -1,0 +1,1 @@
+.alter-merge table  Ev2_TransformRolloutDetails_EventSchemaV2_tmp_01 policy retention softdelete = 18h recoverability = disabled  

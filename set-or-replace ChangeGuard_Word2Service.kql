@@ -1,0 +1,21 @@
+.set-or-replace ChangeGuard_Word2Service <|
+cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').ChangeGuard_ServiceTree_Hierarchy_Snapshot
+| distinct tolower(ServiceId), tolower(ServiceName)
+| extend ServiceId = Column1
+| extend ServiceName_original = Column2
+| project-away Column1, Column2
+| extend ServiceName = replace('(\\(|\\)|/|\\\\|:|,|]|[|[|]|-|@|_)', ' ', ServiceName_original)
+| extend ServiceName = replace(' +(&|\\+) +',' ',ServiceName)
+| extend ServiceName = replace('\\s{2,}', ' ', ServiceName)
+| extend ServiceName = trim('\\s', ServiceName)
+| extend Names = split(ServiceName, ' ')
+| mv-expand Names to typeof(string)
+| extend Names = replace('([0-9A-Za-z_]{3,})(&)([0-9A-Za-z_])', '\\1.\\3', Names)
+| extend Names = replace('([0-9A-Za-z_])(&)([0-9A-Za-z_]{3,})', '\\1.\\3', Names)
+| extend Word = iif(Names matches regex "\\.net", parse_json(strcat('["',Names,'"]')),split(Names, '.'))
+| mv-expand Word to typeof(string)
+| where strlen(Word) > 2
+    and Word !~ 'and'
+    and Word !~ 'for'
+| distinct Word, ServiceId
+

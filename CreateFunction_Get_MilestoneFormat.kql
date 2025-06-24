@@ -1,0 +1,11 @@
+.create-or-alter function with (folder = "Shared", docstring = "Returns an Azure Semester Milestone for a given date; Valid formats: cyhm --> Calendar Year Semester Milestone, fyhm --> Fiscal Year Semester Milestone, em --> Element_Symbol Milestone, EM --> Element_Name Milestone, <anything else> --> Milestone", skipvalidation = "true") 
+    Get_MilestoneFormat(_date:datetime, CYH:string, FYH:string, Symbol:string, ElementName:string, _format:string = "EM"){
+        let m0 = getmonth(_date) % 6;
+        let m = ((iif(m0 == 0, 6, m0) - 1)/2) + 1;
+        case(
+        tolower(_format) == 'cyhm', strcat(CYH, ' - M', m), 
+        tolower(_format) == 'fyhm', strcat(FYH, ' - M', m), 
+        _format == 'em', strcat(Symbol, ' - m', m), 
+        _format == 'EM', strcat(ElementName, ' - M', m), 
+        strcat("M",m)) 
+    }

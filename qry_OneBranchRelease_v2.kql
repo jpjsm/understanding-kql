@@ -1,0 +1,9 @@
+let start = bin(ago(36h), 1h);
+let end   = bin(now(), 1h);
+let TaskId = tolong(now());
+range Ago from start to end step 1h
+| partition by Ago 
+{ 
+    OneBranchRelease(toscalar(Ago) - 1h, toscalar(Ago), "json")
+    | extend RangeId = tolong(toscalar(Ago)), TaskId
+}

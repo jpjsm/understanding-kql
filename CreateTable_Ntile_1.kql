@@ -1,0 +1,1 @@
+.create table Ntile_1 (bucket_id:datetime, tile_id:long, tile_size:long, tile_first:datetime, tile_last:datetime, tile_avg:datetime, tile_stddev:decimal) with (folder = "Test/jujofre", docstring = "First attempt to save N-Tile data from ChangeEvent") 

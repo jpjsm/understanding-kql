@@ -1,0 +1,8 @@
+cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+| join kind = inner (cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_AzureSubscription_Snapshot) on ServiceId
+| project-away Id, Id1, ServiceId1, Created1, CreatedBy1, ModifiedBy1, ChangeVersion1, Modified1, ServiceName1, Name, ChangeVersion, Level, Description,Tags, Created, CreatedBy, Modified, AzureCloud, Environment, IsHostedOnBehalfOf, Notes, MicroServiceId, MicroServiceName, ComponentName, ComponentId,ModifiedBy, ServiceLevel
+| project-reorder DivisionId, OrganizationId, ServiceGroupId, TeamGroupId, ServiceId, SubscriptionId, DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName,SubscriptionName
+| distinct DivisionId, OrganizationId, ServiceGroupId, TeamGroupId, ServiceId, SubscriptionId, DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName,SubscriptionName
+| take 100
+
+

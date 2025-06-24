@@ -1,0 +1,13 @@
+.create-merge table AzureSemesters (
+    Number: int,
+    Symbol: string,
+    ElementName: string,
+    CalendarYear: int,
+    CalendarSemester: int,
+    SemesterBegin: datetime,
+    SemesterEnd: datetime,
+    FiscalYear: int,
+    FiscalSemester: int,
+    CYH: string,
+    FYH: string
+) with (docstring = "Azure Semesters names and schedules")  

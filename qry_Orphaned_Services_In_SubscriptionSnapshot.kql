@@ -1,0 +1,5 @@
+cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+| join kind = rightanti (cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_AzureSubscription_Snapshot) on ServiceId
+| where Environment =~ 'prod'
+| summarize SubscriptionCount = count() by ServiceId, ServiceName
+| order by SubscriptionCount desc, ServiceName

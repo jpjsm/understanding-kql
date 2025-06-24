@@ -1,0 +1,185 @@
+.create-or-alter function with 
+(folder = "Insights/Release", docstring = "ADO compliant release data", skipvalidation = "true")
+Get_Insights_Release_OneBranch(ReleaseDeploymentStartDate:datetime = datetime(1900-01-01), ReleaseDeploymentEndDate:datetime = datetime(1900-01-01), Format:string  = "json", CalculateLatency:bool  = True) {
+	//
+	// Ex: https://msazure.visualstudio.com/One/_release?_a=releases&view=mine&definitionId=11785
+	// ************************
+	// Mapping AzureDevOps and FCM deployment status
+	// ************************
+	let _changeStatus = datatable(AdoStatus:string,FcmStatus:string) [
+		"succeeded","Completed",
+		"notdeployed","Pending",
+		"failed","Failed",
+		"partiallysucceeded","Completed",
+		"inprogress","InProgress",
+		"undefined","Completed"];
+	//
+	// ************************
+	// Function invocation information
+	// ************************
+	//
+	let pullDatetime = now();
+	let pullId = datetime_part("nanosecond", pullDatetime);
+	let pullGuid = new_guid();
+    //
+	// ************************
+    // Get OneBranch Deployment data
+    // ************************
+	let _startDateRange = iff(ReleaseDeploymentStartDate == datetime('1900-01-01'), ago(7d), ReleaseDeploymentStartDate);
+	let _endDateRange = iff(ReleaseDeploymentEndDate == datetime('1900-01-01'), now(), ReleaseDeploymentEndDate);
+	let _release = materialize(cluster('1es').database('AzureDevOps').ReleaseDeployment
+	| where ReleaseDefinitionPath startswith "\\Compliant"
+			and LastModifiedOn between (_startDateRange .. _endDateRange)
+	| join kind = inner (
+		cluster('1es').database('AzureDevOps').Release
+	)
+	on ProjectId, ReleaseId
+	| extend ServiceTreeId = tostring(parse_json(Data).release.artifacts[0].definitionReference.servicetreeid.id)
+			 , ServiceTreeGuid = tostring(parse_json(Data1).environments[0].deployPhasesSnapshot[0].workflowTasks[0].inputs.servicetreeguid)
+			 , DeploymentStatus = tolower(DeploymentStatus)
+	| extend ServiceTreeGuid = iff(ServiceTreeGuid contains "ServiceTree", "", ServiceTreeGuid)
+	| join kind = leftouter _changeStatus on $left.DeploymentStatus == $right.AdoStatus
+	| extend ChangeId = strcat(ProjectId,":",ReleaseId,":",ReleaseEnvironmentId,":",DeploymentId)
+    | extend ChangeIdJson = tostring(pack("ProjectId", ProjectId, "ReleaseId", ReleaseId, "ReleaseEnvionmentId", ReleaseEnvironmentId, "DeploymentId", DeploymentId))
+	| project
+	    EventId = hash_sha256(strcat(ProjectId,ReleaseId, DeploymentId, LastModifiedOn))
+		, ProjectId
+		, ReleaseId
+		, ChangeDescription = strcat(ReleaseName,"-", ReleaseEnvironmentName)
+		, ReleaseDefinitionId
+		, ServiceId = coalesce(ServiceTreeId, ServiceTreeGuid)
+		, DeploymentId
+		, DefinitionEnvironmentId
+		, ChangeState = FcmStatus
+		, ChangeTime = LastModifiedOn
+		, ProjectedEndTime = CompletedOn
+		, LastModifiedOn
+		, ChangeOwner = RequestedByUniqueName
+		, ChangeId
+		, ParentChangeId = ChangeId
+		, ChangeIdJson
+		 );
+    //
+	// ************************
+    // Getting Build infromation
+    // ************************
+    let _builds = _release
+            | join hint.shufflekey = ProjectId kind = inner
+        	(
+        		cluster('1es').database('AzureDevOps').ReleaseArtifact
+				| where Type in ('Build','CloudVaultArtifacts','CloudVaultArtifacts-v2','CloudVaultArtifacts-v3')
+        		| project 
+        			DefinitionReferenceVersionId
+        			, ReleaseId 
+        			, ProjectId
+        	)
+        	on ProjectId, ReleaseId
+        	| join hint.strategy = shuffle kind = leftouter
+        	(
+        		cluster('1es').database('AzureDevOps').Build
+        		| project
+        			ProjectId 
+        			, BuildId = tostring(BuildId) 
+        			, RepositoryId
+        			, SourceVersion
+        	)
+        	on ProjectId, $left.DefinitionReferenceVersionId == $right.BuildId
+			| where isnotempty(DefinitionReferenceVersionId)
+            | extend BuildJson = tostring(pack("ProjectId",ProjectId, "BuildId", DefinitionReferenceVersionId))
+            | extend Build = strcat(ProjectId,":",DefinitionReferenceVersionId)
+            | summarize PayloadId = tostring(make_set(Build)), PayloadIdJson = tostring(make_set(BuildJson))  by ProjectId, ReleaseId;
+    //
+	// ************************
+    // Getting Target Cloud from Release Definition
+    // ************************
+	let _targetCloud = _release
+			| join kind=inner hint.strategy = broadcast (
+				cluster('1es').database('AzureDevOps').ReleaseDefinition | where EtlCurrent == 1
+			) 
+			on ProjectId, ReleaseDefinitionId
+    		| mv-expand env = parse_json(Data).environments
+			| project ProjectId, ReleaseDefinitionId, ReleaseDefinitionEnvironmentId=tolong(env.id), env
+    		| mv-expand deployPhases = env.deployPhases
+    		| mv-expand workflowTasks = deployPhases.workflowTasks
+			| extend
+				TaskId = tostring(workflowTasks.taskId)
+				, Enabled = tolower(workflowTasks.enabled)
+			| where TaskId in ('76386f45-8e3b-45c1-a3f9-58fae4c23e9d', // Approval Svc (min. Usage) (Environment)
+							   'a81eb944-f6e7-40bb-acb3-6f68822bc5ab', // Approval Svc (Used most) (Environment)
+							   '6da5a5a0-cbcf-11e6-aaf4-838b09d927f5', // Deploy (LocationType)
+							   'b633975b-5833-4d90-a3de-e60ba81231b0', // Deploy (Min. Usage) (LocationType)
+							   '7973b2d1-788d-4bd7-aa20-8a6897de4a5f') // Express V2
+				and Enabled =~ 'true'
+			| extend ApprovalServiceEnvironment = tostring(workflowTasks.inputs.ApprovalServiceEnvironment) //TaskId: 7973b2d1-788d-4bd7-aa20-8a6897de4a5f  
+					 , Environment = tostring(workflowTasks.inputs.environment)   // TaskId: a81eb944-f6e7-40bb-acb3-6f68822bc5ab, 76386f45-8e3b-45c1-a3f9-58fae4c23e9d
+					 , LocationType = tostring(workflowTasks.inputs.locationType)  // TaskId: 6da5a5a0-cbcf-11e6-aaf4-838b09d927f5, b633975b-5833-4d90-a3de-e60ba81231b0
+			| project ProjectId , TaskId, ApprovalServiceEnvironment, LocationType, Environment, DefinitionEnvironmentId=tolong(env.id), ReleaseDefinitionId
+			| summarize Environment=max(Environment), ApprovalServiceEnvironment=max(ApprovalServiceEnvironment), LocationType=max(LocationType) by ProjectId, ReleaseDefinitionId, DefinitionEnvironmentId
+			| extend TargetEnv = coalesce(ApprovalServiceEnvironment, Environment, LocationType)
+			| project
+				ProjectId
+				, ReleaseDefinitionId
+				, DefinitionEnvironmentId
+				, Environment
+				, ApprovalServiceEnvironment
+				, LocationType
+				, TargetEnv;
+    //
+	// ************************
+    // Final Project
+    // ************************
+	_release
+	| join kind = leftouter(
+		_targetCloud
+	) on ProjectId, ReleaseDefinitionId, DefinitionEnvironmentId
+	| join kind = leftouter (
+	   _builds
+	) on ProjectId, ReleaseId
+    | extend Latency = iif(CalculateLatency, pullDatetime - ChangeTime, timespan(null))
+    | extend TimeStamp = pullDatetime
+    | extend SchemaVersion = "2.0"
+    | extend SourceSystem = "onebranch"
+    | extend PayloadSystem = "onebranch"
+    | extend LocationId = TargetEnv
+    | extend DeploymentTarget = TargetEnv
+    | extend DeploymentTargetType = "cloud"
+    | extend PullId = pullId
+    | extend PullGuid = tostring(pullGuid)
+    | project-away ProjectId
+                , ReleaseId
+                , ReleaseDefinitionId
+                , DeploymentId
+                , DefinitionEnvironmentId
+                , LastModifiedOn
+                , ProjectId1
+                , ReleaseDefinitionId1
+                , DefinitionEnvironmentId1
+                , Environment	
+                , ApprovalServiceEnvironment
+                , LocationType	
+                , TargetEnv	
+                , ProjectId2	
+                , ReleaseId1	
+	| project-reorder TimeStamp
+			  , SchemaVersion
+			  , EventId
+			  , ChangeDescription
+			  , SourceSystem 
+			  , ChangeId
+			  , ParentChangeId
+			  , ServiceId
+			  , PayloadSystem 
+			  , PayloadId
+			  , LocationId 
+			  , DeploymentTarget
+			  , DeploymentTargetType
+			  , ChangeState
+			  , ChangeTime
+			  , ProjectedEndTime
+			  , ChangeOwner
+			  , ChangeIdJson
+			  , PayloadIdJson
+			  , Latency
+			  , PullId
+			  , PullGuid;
+} 

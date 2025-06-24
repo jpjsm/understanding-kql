@@ -1,0 +1,7 @@
+.create-or-alter function 
+    with (folder = "AzPhyNet", docstring = "Retrive Device Health for specific datetime range", skipvalidation = "true")
+    Pull_DeviceHealthLookupMultiSearch (range_start:datetime, range_end:datetime, searchstring:string = ''){
+        cluster('azphynet').database('azphynetmds').f_DeviceHealthLookupMultiSearch(range_start, range_end, searchstring)
+            | join kind=leftanti hint.strategy=broadcast ( DeviceHealthLookupMultiSearch ) on TIMESTAMP, DeviceName, Cluster, Group, Datacenter, NgsDeviceType, AzureDeviceType
+            | extend PullID = now(), Latency = TIMESTAMP - bin(now(), 1minute)    
+    }

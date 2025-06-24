@@ -1,0 +1,22 @@
+let deployments = ChangeGuard_Ev2_DeploymentChecks
+| distinct ChangeAssessmentId, ChangeAssessmentTimeStamp
+| extend binnedTimestamp = bin(ChangeAssessmentTimeStamp, 1h)
+| summarize deploymentCount = count() by binnedTimestamp;
+let exceptions = ChangeGuard_ExceptionRequest
+| distinct RequestDate, ExceptionRequestId, ExceptionRequestStatus
+| extend binnedTimestamp = bin(RequestDate, 1h)
+| summarize exceptionCount = count() by binnedTimestamp;
+deployments
+| join kind = inner (exceptions) on binnedTimestamp
+| project-away binnedTimestamp1 
+| union ( deployments
+| join kind = leftanti  (exceptions) on binnedTimestamp
+| project binnedTimestamp, deploymentCount, exceptionCount = 0)
+| union ( deployments
+| join kind = rightanti   (exceptions) on binnedTimestamp
+| project binnedTimestamp, deploymentCount = 0, exceptionCount)
+| order by binnedTimestamp asc
+| extend TimeStamp = binnedTimestamp
+| extend Deployments = deploymentCount
+| extend ExceptionRequests = exceptionCount
+| render linechart with ( xcolumn = TimeStamp, ycolumns = Deployments, ExceptionRequests, ysplit=axes )

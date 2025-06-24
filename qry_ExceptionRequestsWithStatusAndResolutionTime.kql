@@ -1,0 +1,4 @@
+ChangeGuard_ExceptionRequest
+| distinct ExceptionRequestId, RequestDate, ExceptionRequestStatus, ApproverEmail, LastUpdate, Approvers
+| extend TimeSpanToDecision = (LastUpdate - RequestDate)
+| extend TimeToDecision_hours = TimeSpanToDecision / 1h

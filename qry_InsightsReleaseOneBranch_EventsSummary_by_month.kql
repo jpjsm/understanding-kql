@@ -1,0 +1,10 @@
+cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').InsightsReleaseOneBranch 
+| extend Change_date = bin(ChangeTime, 1d)
+| summarize Events_day = count() by Change_date
+| sort by Change_date
+| summarize Events_day_avg = round(avg(Events_day), 0)
+    , Events_day_max = max(Events_day)
+    , Events_day_min = min(Events_day)
+    , Total_days = dcount(Change_date, 4)
+    , Total_Events = sum(Events_day) by year=getyear(Change_date), month=getmonth(Change_date)
+| sort by year asc, month asc

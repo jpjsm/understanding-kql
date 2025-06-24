@@ -1,0 +1,7 @@
+cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').InsightsReleaseOneBranch 
+| where isnotnull(Latency)
+    and ChangeTime >= datetime('2020-07-07') 
+| summarize Latency_avg = avg(Latency)
+         ,  Latency_max = max(Latency)
+         ,  Latency_min = min(Latency)
+         ,  Rows = count() by bin(ChangeTime, 1d) 

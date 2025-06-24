@@ -1,0 +1,17 @@
+ChangeGuard_Ev2_DeploymentChecks
+| where ChangeAssessmentTimeStamp  between (todatetime('2021-07-20T14:30:00Z') .. todatetime('2021-07-22T15:30:00Z') )
+| distinct ChangeAssessmentId, ChangeAssessmentTimeStamp, ExceptionRequestUrl, ServiceId, SubscriptionId, Region, AllowedToDeploy
+| summarize TargetsAllowedToDeploy = countif(AllowedToDeploy)
+          , TargetsBlocked = countif(AllowedToDeploy == false)
+          , TotalTargets = count() 
+          by ChangeAssessmentId
+| project ChangeAssessmentId, TargetsAllowedToDeploy, TargetsBlocked, TotalTargets
+| extend RolloutState = iif(TargetsBlocked == 0, '3.- Deployed all successful', iif(TargetsAllowedToDeploy == 0, '1.- Blocked', '2.- Partially Deployed'))
+|summarize RolloutCount = count() by RolloutState
+| union (ChangeGuard_Ev2_DeploymentChecks
+| where ChangeAssessmentTimeStamp  between (todatetime('2021-07-20T14:30:00Z') .. todatetime('2021-07-22T15:30:00Z') )
+| distinct ChangeAssessmentId
+| extend RolloutState = '4.- Total'
+| summarize RolloutCount = count() by RolloutState
+)
+| order by RolloutState asc

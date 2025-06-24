@@ -1,0 +1,3 @@
+cluster('genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_PeopleHierarchy_Snapshot
+| extend mgrs = strcat_array(Managers, " | ")
+| project EmailName, FullName, PreferredFullName, mgrs

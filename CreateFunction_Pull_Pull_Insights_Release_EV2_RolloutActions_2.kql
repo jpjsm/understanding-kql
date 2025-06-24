@@ -1,0 +1,16 @@
+.create-or-alter function with (folder = "Engpipe", docstring = "Retrive Insights_Release_EV2_RolloutActions for specific datetime range", skipvalidation = "true") Pull_Insights_Release_EV2_RolloutActions_2(range_start:datetime, range_end:datetime, searchstring:string="") {
+        cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').fn_Insights_Release_EV2_RolloutActions2(range_start, range_end)
+            |   join kind=leftanti hint.strategy=broadcast (Insights_Release_EV2_RolloutActions) on RolloutID, LocationKey, RolloutAction, ActionStartedOn, ActionCompletedOn
+            |   extend PullID = format_datetime(now(), 'yyyy-MM-dd HH:mm:ss.fffffff'),
+                       Latency = ActionCompletedOn - bin(now(), 1minute), 
+                       HealthAccount_R = tostring(HealthAccount), 
+                       HealthEndpoint_R = tostring(HealthEndpoint), 
+                       HealthDimensionsType_R = tostring(HealthDimensionsType),
+                       InitialWaitDurationInMinutes_R = toint(InitialWaitDurationInMinutes),
+                       MaxElasticDurationInMinutes_R = toint(MaxElasticDurationInMinutes),
+                       MonitorDurationInMinutes_R = toint(MonitorDurationInMinutes),
+                       HealthResources_R = tostring(HealthResources)
+            |   project-away HealthAccount, HealthEndpoint, HealthDimensionsType, InitialWaitDurationInMinutes, MaxElasticDurationInMinutes, MonitorDurationInMinutes, HealthResources
+            |   project-rename HealthAccount=HealthAccount_R, HealthEndpoint=HealthEndpoint_R, HealthDimensionsType=HealthDimensionsType_R, InitialWaitDurationInMinutes=InitialWaitDurationInMinutes_R, MaxElasticDurationInMinutes=MaxElasticDurationInMinutes_R, MonitorDurationInMinutes=MonitorDurationInMinutes_R, HealthResources=HealthResources_R
+            |   project-reorder RolloutID,Location,LocationKey,ServiceOid,RolloutAction,RolloutActionDetail,ExtensionTypeFamily,ExtensionTypeDetail,ActionStartedOn,ActionCompletedOn,ExtensionTypeRaw,RolloutActionRaw,RowInsertedDate,HealthAccount,HealthEndpoint,HealthDimensionsType,InitialWaitDurationInMinutes,MaxElasticDurationInMinutes,MonitorDurationInMinutes,HealthResources, PullID, Latency
+   } 

@@ -1,0 +1,30 @@
+let period = 1d;
+let Rollouts = ChangeGuard_Ev2_DeploymentChecks
+| distinct ChangeAssessmentId, ChangeAssessmentTimeStamp
+| extend TimeStampPDT = ChangeAssessmentTimeStamp - 7h
+| extend binnedTimestamp = bin(TimeStampPDT, period)
+| summarize deploymentCount = count() by binnedTimestamp;
+let exceptions = ChangeGuard_ExceptionRequest
+| distinct ExceptionRequestId, RequestDate
+| extend TimeStampPDT = RequestDate - 7h
+| extend binnedTimestamp = bin(TimeStampPDT, period)
+| summarize exceptionCount = count() by binnedTimestamp;
+let RolloutsWithExceptions = Rollouts
+| join kind = inner (exceptions) on binnedTimestamp
+| project-away binnedTimestamp1 
+| union ( Rollouts
+| join kind = leftanti  (exceptions) on binnedTimestamp
+| project binnedTimestamp, deploymentCount, exceptionCount = 0)
+| union ( Rollouts
+| join kind = rightanti   (exceptions) on binnedTimestamp
+| project binnedTimestamp, deploymentCount = 0, exceptionCount)
+| order by binnedTimestamp asc
+| extend TimeStampPDT = binnedTimestamp
+| extend Rollouts = deploymentCount
+| extend ExceptionRequests = exceptionCount
+| project-away binnedTimestamp, deploymentCount, exceptionCount
+//| project-reorder TimeStamp, TimeStampPDT, Rollouts, ExceptionRequests;
+| project-reorder TimeStampPDT, Rollouts, ExceptionRequests;
+RolloutsWithExceptions
+//| summarize Rollouts = sum(Rollouts), Exceptions = sum(ExceptionRequests) by TimeStamp
+//| render scatterchart with (xcolumn=TimeStamp, ysplit= axes, ycolumns=Rollouts, Exceptions);

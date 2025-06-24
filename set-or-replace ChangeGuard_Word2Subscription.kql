@@ -1,0 +1,31 @@
+.set-or-replace ChangeGuard_Word2Subscription <|
+let CandidateWords = cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').ChangeGuard_ServiceTree_Hierarchy_Snapshot
+| extend SubscriptionId = tolower(SubscriptionId)
+| extend SubscriptionName = tolower(SubscriptionName)
+| distinct SubscriptionId, SubscriptionName
+| extend SubscriptionName = replace(strcat('(\\(|\\)|/|\\\\|:|,|\\]|\\[|-|@|_|\\$|%|!|\\*|}|{|\\?|"|~|#|\'|\\p{','Zs','})+'), ' ', SubscriptionName)
+| extend SubscriptionName = replace(' +(&|\\+) +',' ',SubscriptionName)
+| extend SubscriptionName = replace('\\s{2,}', ' ', SubscriptionName)
+| extend SubscriptionName = trim('\\s', SubscriptionName)
+| extend Names = split(SubscriptionName, ' ')
+| mv-expand Names to typeof(string)
+| extend Names = replace('([0-9A-Za-z_]{3,})(&)([0-9A-Za-z_])', '\\1.\\3', Names)
+| extend Names = replace('([0-9A-Za-z_])(&)([0-9A-Za-z_]{3,})', '\\1.\\3', Names)
+| extend Names = replace('^[0-9]{1,3}$','.', Names)
+| where Names !~ '.'
+| extend Word = iif(Names matches regex "\\.net", parse_json(strcat('["',Names,'"]')),split(Names, '.'))
+| mv-expand Word to typeof(string)
+| extend Word = replace('^\\+?([0-9]{1,3}|[0-9]{1,2}[A-Za-z]|[0-9][A-Za-z][0-9]|[A-Za-z][0-9]{1,2})$','.', Word)
+| where Word !~ '.'
+| where strlen(Word) > 2;
+//
+let TooCommonTriplets = CandidateWords
+| where strlen(Word) == 3
+| summarize rows = count() by Word
+| where rows < 20
+| project-away rows;
+//
+CandidateWords
+| where strlen(Word) > 3 or Word in (TooCommonTriplets)
+| distinct Word, SubscriptionId
+

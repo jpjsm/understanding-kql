@@ -1,0 +1,4 @@
+cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_Hierarchy_Snapshot
+| where DivisionId =~ "85dd10f4-5484-48fa-b11f-6e6ab07f8d4c"
+| join kind = inner (cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_AzureSubscription_Snapshot) on ServiceId
+| distinct DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName, SubscriptionName, DivisionId, OrganizationId, ServiceGroupId, TeamGroupId, ServiceId, SubscriptionId

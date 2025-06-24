@@ -1,0 +1,4 @@
+.create table IncidentXChangeRecordForChangeCardReadOnly ( 
+    IncidentId:long, 
+    ChangeRecordId:long
+) with ( docstring = "Incident Change record from Azure SQL view" );

@@ -1,0 +1,16 @@
+.create-or-alter function 
+    with (folder = "SDP", docstring = "Retrive RolloutDetailAnalyticsEvent for specific datetime range", skipvalidation = "true")
+    Pull_RolloutDetailAnalyticsEvent (range_start:datetime, range_end:datetime){
+        cluster('Admcluster').database('ADMDatabase').RolloutDetailAnalyticsEvent
+        | where todatetime(EndTime) between (range_start .. range_end)
+        | where RolloutAction !~ "deploy"
+        | project RolloutID
+            , env_cv
+            , Location = tolower(replace("'","",replace("-","",replace(" ","",Location))))
+            , Subscription
+            , ResourceOperations
+            , RolloutAction
+            , ActionStartedOn = StartTime
+            , ActionCompletedOn = EndTime 
+        | join kind=leftanti hint.strategy=broadcast (SDP) on RolloutID, env_cv, Location, Subscription
+    }

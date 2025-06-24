@@ -1,0 +1,9 @@
+ChangeEvent
+| where TIMESTAMP >= ago(90d)
+| extend date_bin = bin(TIMESTAMP, 1d)
+| summarize count() by ExternalSource, ExternalSourceName, bin(date_bin, 1d)
+| order by date_bin desc
+| extend PREV = prev(date_bin)
+| extend PREV = iif(isnull( PREV ), bin(now(), 1d), PREV)
+| extend DeltaDays = datetime_diff("day", PREV, date_bin)
+| order by ExternalSourceName asc, bin(date_bin, 1d)

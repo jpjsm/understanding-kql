@@ -1,0 +1,6 @@
+let latencies = range latency from 1 to 100000 step 1;
+latencies
+| extend r1 = rand()
+| extend r2 = rand()
+| extend latency = sqrt(-2.0*log(r1))*cos(2.0*pi()*r2) + 7
+| project-keep latency

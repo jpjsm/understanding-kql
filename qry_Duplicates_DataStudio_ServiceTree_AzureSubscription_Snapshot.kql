@@ -1,0 +1,4 @@
+let DupSubscriptions = cluster('genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_AzureSubscription_Snapshot | summarize SubscriptionCount = count() by SubscriptionId| where SubscriptionCount > 1| project SubscriptionId;
+cluster('genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_AzureSubscription_Snapshot 
+| where SubscriptionId in~ (DupSubscriptions)
+| sort by SubscriptionId, ServiceName, Environment;

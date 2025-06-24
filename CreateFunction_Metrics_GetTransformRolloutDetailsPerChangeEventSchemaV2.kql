@@ -1,0 +1,17 @@
+.create-or-alter function with (folder = "Ev2", docstring = "Metrics for 'Get TransformRolloutDetailsPerChangeEventSchemaV2' job", skipvalidation = "true") 
+fn_Metrics_GetTransformRolloutDetailsPerChangeEventSchemaV2(){ 
+    Ev2_TransformRolloutDetails_EventSchemaV2
+    | summarize 
+        Avg_Latency = avg(Latency), 
+        Max_Latency = max(Latency), 
+        Min_Latency = min(Latency), 
+        Total_rows = count() by PullId
+    | extend PullDate = todatetime(PullId)
+    | extend Year = getyear(PullDate)
+    | extend Month = getmonth(PullDate)
+    | extend Day = dayofmonth(PullDate)
+    | extend Weekday = dayofweek(PullDate)/1d
+    | extend Hour = hourofday(PullDate)
+    | extend Minute = datetime_part("minute", PullDate)
+    | sort by PullId desc 
+}

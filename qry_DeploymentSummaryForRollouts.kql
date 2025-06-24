@@ -1,0 +1,11 @@
+ChangeGuard_Ev2_DeploymentChecks
+| where ChangeAssessmentTimeStamp  between (todatetime('2021-07-20T14:30:00Z') .. todatetime('2021-07-22T15:30:00Z') )
+| distinct DeploymentId, SubscriptionId, Region
+| summarize deployments = count() by DeploymentId
+| summarize Rollouts = count(),
+            DeploymentsTotal = sum(deployments),
+            MaxDeploymentsPerRollout = max(deployments), 
+            MinDeploymentsPerRollout =  min(deployments), 
+            AvgDeploymentsPerRollout = avg(deployments),
+            DeploymentsPerRollout_90pctl = percentile(deployments, 90),
+            DeploymentsPerRollout_95pctl = percentile(deployments, 95)            

@@ -1,0 +1,11 @@
+let _R = (range_start:datetime, range_end:datetime){toscalar(cluster('Engpipe').database('engpipe').fn_Insights_Release_EV2_RolloutActions(range_start, range_end)
+| count)};
+let _J = (range_start:datetime, range_end:datetime){toscalar(cluster('Fcmdata').database('FCMKustoStore').fn_Insights_Release_EV2_RolloutActions2(range_start, range_end)
+| count)};
+range Range_start from todatetime('2020-06-09 00:00:00') to bin(now(), 1h) step 1h
+| partition by Range_start(
+      extend r = _R(toscalar(Range_start), toscalar(Range_start + 1h))
+    | extend j = _J(toscalar(Range_start), toscalar(Range_start + 1h))
+    | extend delta = r - j
+    | project Range_start, R=r, J=j, Delta = delta
+    )

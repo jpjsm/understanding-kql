@@ -1,0 +1,9 @@
+.create-or-alter function with (docstring = "Get basic update information of ChangeEventV2 data" , folder = "ChangeEventV2" ) ChangeEventV2_updates (since:datetime = datetime(637250976630604226)) { 
+    ChangeEventV2_005
+    | summarize Rows_By_Pull = count() by PullId
+    | extend PullId_datetime = todatetime(tolong(PullId))
+    | sort by PullId asc
+    | extend TimeSpan_in_between = totimespan(tolong(PullId) - tolong(prev(PullId,1, datetime(637250976630604226))))
+    | project-away PullId 
+    | project-reorder PullId_datetime, TimeSpan_in_between, Rows_By_Pull
+}

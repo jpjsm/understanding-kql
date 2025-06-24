@@ -1,0 +1,25 @@
+.create-or-alter function with (folder = "ChangeEventV2", docstring = "Retrieve OneBranch Release data, in ChangeEventV2 format, into ChangeEventV2 table for a specific datetime range", skipvalidation = "true") 
+Pull_Insights_Release_OneBranchRelease(range_start:datetime, range_end:datetime, searchstring:string="") {
+cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(range_start, range_end)
+| join kind = leftanti (cluster('fcmdata.kusto.windows.net').database('FCMKustoStore').ChangeEventV2) on EventId, ChangeId, ParentChangeId
+| extend PullId = tostring(tolong(now())), ReleaseId = "TBD", PayloadId = tostring(PayloadId)
+| project-reorder TimeStamp, 
+                  SchemaVersion, 
+                  EventId, 
+                  ChangeDescription, 
+                  SourceSystem, 
+                  ChangeId, 
+                  ParentChangeId, 
+                  ReleaseId, 
+                  ServiceId, 
+                  PayloadSystem, 
+                  PayloadId, 
+                  LocationId, 
+                  DeploymentTarget, 
+                  DeploymentTargetType, 
+                  ChangeState, 
+                  ChangeTime, 
+                  ProjectedEndTime, 
+                  ChangeOwner, 
+                  PullId
+}

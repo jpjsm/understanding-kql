@@ -1,0 +1,11 @@
+.set-or-replace Ev2_TransformRolloutDetails_EventSchemaV2 <|
+    cluster('fcmdata').database('FCMKustoStore').Ev2_TransformRolloutDetails_EventSchemaV2_tmp_01
+    | extend ChangeTime = todatetime(ChangeTime)
+    | extend PullId = tolong(ingestion_time())
+    | join kind=leftsemi (cluster('fcmdata').database('FCMKustoStore').Ev2_TransformRolloutDetails_EventSchemaV2_tmp_01
+                            | extend ChangeTime = todatetime(ChangeTime)
+                            | extend PullId = tolong(ingestion_time())
+                            | summarize first_row = min(PullId) by EventId, SourceSystem, ChangeId, ParentChangeId,ServiceId, LocationId, DeploymentTarget, ChangeTime
+                            | project EventId, SourceSystem, ChangeId, ParentChangeId,ServiceId, LocationId, DeploymentTarget, ChangeTime, PullId = first_row   
+                         ) on EventId, SourceSystem, ChangeId, ParentChangeId,ServiceId, LocationId, DeploymentTarget, ChangeTime, PullId
+    | extend Latency = TimeStamp - ChangeTime

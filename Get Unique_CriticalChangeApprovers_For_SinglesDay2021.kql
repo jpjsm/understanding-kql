@@ -1,0 +1,76 @@
+let ChangeGuard_ServiceTree_Hierarchy_InScope_SinglesDay2021 = ChangeGuard_ServiceTree_Hierarchy_Snapshot
+| extend ServiceId = toguid(ServiceId)
+| extend TeamGroupId = toguid(TeamGroupId)
+| extend ServiceGroupId = toguid(ServiceGroupId)
+| extend OrganizationId = toguid(OrganizationId)
+| extend DivisionId = toguid(DivisionId)
+| distinct DivisionId, OrganizationId, ServiceGroupId, TeamGroupId, ServiceId, DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName
+| join kind=leftsemi (ChangeGuard_SinglesDay2021_InCCOAScopeServiceIds) on $left.ServiceId == $right.ServiceId;
+let Division_CriticalChangeApprovers_For_SinglesDay2021 = ChangeGuard_ServiceTree_Hierarchy_InScope_SinglesDay2021
+| join kind = inner (ChangeGuard_CriticalChangeApprovers_Snapshot 
+                     | where OrganizationLevel =~ 'Division' 
+                     | extend OrganizationId = toguid(OrganizationId)) on $left.DivisionId == $right.OrganizationId
+| project-keep DivisionId, OrganizationId, ServiceGroupId, TeamGroupId, ServiceId, DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName, CriticalChangeApprovers;
+let Organization_CriticalChangeApprovers_For_SinglesDay2021 = ChangeGuard_ServiceTree_Hierarchy_InScope_SinglesDay2021
+| join kind = inner (ChangeGuard_CriticalChangeApprovers_Snapshot 
+                     | where OrganizationLevel =~ 'Organization' 
+                     | extend OrganizationId = toguid(OrganizationId)) on $left.OrganizationId == $right.OrganizationId
+| project-keep DivisionId, OrganizationId, ServiceGroupId, TeamGroupId, ServiceId, DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName, CriticalChangeApprovers;
+let ServiceGroup_CriticalChangeApprovers_For_SinglesDay2021 = ChangeGuard_ServiceTree_Hierarchy_InScope_SinglesDay2021
+| join kind = inner (ChangeGuard_CriticalChangeApprovers_Snapshot 
+                     | where OrganizationLevel =~ 'ServiceGroup' 
+                     | extend OrganizationId = toguid(OrganizationId)) on $left.ServiceGroupId == $right.OrganizationId
+| project-keep DivisionId, OrganizationId, ServiceGroupId, TeamGroupId, ServiceId, DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName, CriticalChangeApprovers;
+let TeamGroup_CriticalChangeApprovers_For_SinglesDay2021 = ChangeGuard_ServiceTree_Hierarchy_InScope_SinglesDay2021
+| join kind = inner (ChangeGuard_CriticalChangeApprovers_Snapshot 
+                     | where OrganizationLevel =~ 'TeamGroup' 
+                     | extend OrganizationId = toguid(OrganizationId)) on $left.TeamGroupId == $right.OrganizationId
+| project-keep DivisionId, OrganizationId, ServiceGroupId, TeamGroupId, ServiceId, DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName, CriticalChangeApprovers;
+let Service_CriticalChangeApprovers_For_SinglesDay2021 = ChangeGuard_ServiceTree_Hierarchy_InScope_SinglesDay2021
+| join kind = inner (ChangeGuard_CriticalChangeApprovers_Snapshot 
+                     | where OrganizationLevel =~ 'Service' 
+                     | extend OrganizationId = toguid(OrganizationId)) on $left.ServiceId == $right.OrganizationId
+| project-keep DivisionId, OrganizationId, ServiceGroupId, TeamGroupId, ServiceId, DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName, CriticalChangeApprovers;
+let CriticalChangeApprovers_For_SinglesDay2021 = Division_CriticalChangeApprovers_For_SinglesDay2021 
+| union Organization_CriticalChangeApprovers_For_SinglesDay2021,
+        ServiceGroup_CriticalChangeApprovers_For_SinglesDay2021,
+        TeamGroup_CriticalChangeApprovers_For_SinglesDay2021,
+        Service_CriticalChangeApprovers_For_SinglesDay2021
+| extend Approvers = CriticalChangeApprovers;
+let BusinessOwners_Used_For_SinglesDay2021 = ChangeGuard_ServiceTree_Hierarchy_InScope_SinglesDay2021
+| join kind = leftanti (CriticalChangeApprovers_For_SinglesDay2021) on ServiceId
+| join kind = inner (ChangeGuard_OrganizationCommonMetadata | where OrganizationLevel =~ 'ServiceGroup' | extend OrganizationId = toguid(OrganizationId)) on $left.ServiceGroupId == $right.OrganizationId
+| extend ServiceGroupBusinessOwners = split(tolower(BusinessOwner),';')
+| extend Approvers = ServiceGroupBusinessOwners
+| project-keep DivisionId, OrganizationId, ServiceGroupId, TeamGroupId, ServiceId, DivisionName, OrganizationName, ServiceGroupName, TeamGroupName, ServiceName, Approvers;
+//
+// ChangeGuard_ServiceTree_Hierarchy_InScope_SinglesDay2021 | summarize Count = count() by Source = 'ChangeGuard_ServiceTree_Hierarchy_InScope_SinglesDay2021'
+// | union (CriticalChangeApprovers_For_SinglesDay2021 | summarize Count = count() by Source = 'CriticalChangeApprovers_For_SinglesDay2021')
+// | union (BusinessOwners_Used_For_SinglesDay2021 | summarize Count = count() by Source = 'BusinessOwners_Used_For_SinglesDay2021');
+// 
+let Unique_CriticalChangeApprovers_For_SinglesDay2021 = CriticalChangeApprovers_For_SinglesDay2021
+| mv-expand CriticalChangeApprover = CriticalChangeApprovers to typeof(string)
+| extend Source = 'CriticalChangeApprover'
+| extend Approver = CriticalChangeApprover
+| distinct ServiceGroupName, ServiceName, Approver, Source;
+let Unique_BusinessOwners_Used_For_SinglesDay2021 = BusinessOwners_Used_For_SinglesDay2021
+| mv-expand ServiceGroupBusinessOwner = Approvers to typeof(string)
+| extend Source = 'BusinessOwners'
+| extend Approver = ServiceGroupBusinessOwner
+| distinct ServiceGroupName, ServiceName, Approver, Source;
+//
+// Find Approver aliases with spaces
+// Unique_CriticalChangeApprovers_For_SinglesDay2021
+// | union Unique_BusinessOwners_Used_For_SinglesDay2021
+// | where Approver matches regex " "
+// | order by ServiceGroupName asc, ServiceName asc, Approver asc
+// | project ServiceGroupName, ServiceName, Approver, Source;
+//
+let CriticalChangeApprovers_For_SinglesDay2021_by_ServiceGroup = CriticalChangeApprovers_For_SinglesDay2021
+| mv-expand CriticalChangeApprover = CriticalChangeApprovers to typeof(string)
+| extend Source = 'CriticalChangeApprover'
+| extend Approver = CriticalChangeApprover
+| distinct Source, Approver;
+CriticalChangeApprovers_For_SinglesDay2021 | project ServiceGroupName, ServiceName, Approvers
+| union (BusinessOwners_Used_For_SinglesDay2021 | project ServiceGroupName, ServiceName, Approvers)
+| order by ServiceGroupName asc, ServiceName asc;

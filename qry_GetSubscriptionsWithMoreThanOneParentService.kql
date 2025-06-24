@@ -1,0 +1,3 @@
+ChangeGuard_ServiceTree_Hierarchy_Snapshot
+| summarize serviceCount = count() by SubscriptionId, Environment
+| where serviceCount > 1

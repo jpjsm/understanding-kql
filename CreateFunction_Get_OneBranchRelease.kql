@@ -1,0 +1,32 @@
+.create-or-alter function with (folder = "Test/jujofre", docstring = "Test function to retrieve Engpipe data", skipvalidation = "true")
+Get_OneBranchRelease() {
+let Ago24 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(25h), 1h), bin(ago(24h), 1h))
+            | extend Ago = 24;
+let Ago23 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(24h), 1h), bin(ago(23h), 1h))
+            | extend Ago = 23;
+let Ago22 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(23h), 1h), bin(ago(22h), 1h))
+            | extend Ago = 22;
+let Ago21 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(22h), 1h), bin(ago(21h), 1h))
+            | extend Ago = 21;
+let Ago20 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(21h), 1h), bin(ago(20h), 1h))
+            | extend Ago = 20;
+let Ago19 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(20h), 1h), bin(ago(19h), 1h))
+            | extend Ago = 19;
+let Ago18 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(19h), 1h), bin(ago(18h), 1h))
+            | extend Ago = 18;
+let Ago17 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(18h), 1h), bin(ago(17h), 1h))
+            | extend Ago = 17;
+let Ago16 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(17h), 1h), bin(ago(16h), 1h))
+            | extend Ago = 16;
+let Ago15 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(16h), 1h), bin(ago(15h), 1h))
+            | extend Ago = 15;
+let Ago14 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(15h), 1h), bin(ago(14h), 1h))
+            | extend Ago = 14;
+let Ago13 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(14h), 1h), bin(ago(13h), 1h))
+            | extend Ago = 13;
+let Ago12 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(13h), 1h), bin(ago(12h), 1h))
+            | extend Ago = 12;
+let Ago11 = cluster('engpipe.kusto.windows.net').database('engpipe').OneBranchRelease(bin(ago(12h), 1h), bin(ago(11h), 1h))
+            | extend Ago = 11;
+union Ago24, Ago23, Ago22, Ago21, Ago20, Ago19, Ago18, Ago17, Ago16, Ago15, Ago14, Ago13, Ago12, Ago11
+} 

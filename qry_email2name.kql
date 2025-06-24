@@ -1,0 +1,2 @@
+cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_PeopleHierarchy_Snapshot
+| project EmailName, FullName, PreferredFullName

@@ -1,0 +1,21 @@
+cluster('fcmdata').database('FCMKustoStore').ChangeCard_Performance_RawData
+| extend Semester = tostring(split(M," - ")[0])
+| summarize 
+    OKR_pct = round(100.0 * countif(OKRStatus == 'MeetsOKR') / count()), 
+    InTop5_pct = round(100.0 * countif(RelevanceRank >= 5) / count()), 
+    Total_Cases = count() by Semester
+| extend Milestone = ""
+| top 2 by Semester asc  
+|union (cluster('fcmdata').database('FCMKustoStore').ChangeCard_Performance_RawData
+| extend Semester = tostring(split(M," - ")[0])
+| extend Milestone = tostring(split(M," - ")[1])
+| summarize 
+    OKR_count = countif(OKRStatus == 'MeetsOKR'), 
+    OKR_pct = round(100.0 * countif(OKRStatus == 'MeetsOKR') / count()), 
+    InTop5_count = countif(RelevanceRank <= 5), 
+    InTop5_pct = round(100.0 * countif(RelevanceRank <= 5) / count()), 
+    Total_Cases = count() by Semester, Milestone
+| sort by Semester asc, Milestone asc 
+| take 6)
+| sort by Semester asc, Milestone asc
+| project-reorder Semester, Milestone, OKR_count, OKR_pct, InTop5_count, InTop5_pct, Total_Cases

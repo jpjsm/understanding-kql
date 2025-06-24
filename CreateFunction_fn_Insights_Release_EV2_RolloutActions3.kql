@@ -1,0 +1,103 @@
+.create-or-alter function with (folder = "Insights\\Release", skipvalidation = "true") 
+fn_Insights_Release_EV2_RolloutActions3(StartDate:datetime=datetime(0001-01-01T00:00:00.0000000Z), EndDate:datetime=datetime(0001-01-01T00:00:00.0000000Z)) {
+	//NOTE: Please notify FCM team about changes in this function as they have taken a depedency.
+    // EV2 rollouts detail listing non-deploy actions.
+    // Sets cluster and database to use. Get Watermark from last run
+    let defaultCluster='engpipe.kusto.windows.net';
+    let currentDb = 'engpipe';
+    let _startDateRange = iff( StartDate == datetime('0001-01-01'), toscalar(
+                          cluster(defaultCluster).database(currentDb).DeploymentsExpressV2RolloutActions 
+                          | summarize max(ActionCompletedOn)), StartDate);
+	let _endDateRange = iff(EndDate == datetime('0001-01-01'), now(), EndDate);
+    cluster('Admcluster').database('ADMDatabase').RolloutDetailAnalyticsEvent
+    | where todatetime(EndTime) between (iif(isempty(_startDateRange),datetime("2020-01-01"),_startDateRange) .. _endDateRange)
+    | where RolloutAction !~ "deploy" and Status !~ "Running"
+    | project RolloutID
+            , env_cv
+            , Location = tolower(replace("'","",replace("-","",replace(" ","",Location))))
+            , Subscription
+            , ResourceOperations
+            , RolloutAction
+            , ActionStartedOn = StartTime
+            , ActionCompletedOn = EndTime
+			, HealthActionInfo
+    // ResourceOperations is massive text blob. The Extension information and the code
+    // below came from AzureGlobal, and extract the actual name of the Extension.
+    | parse kind = regex ResourceOperations with * '"ResourceType": "'ExtensionType'"'
+	// For action item other than deploy, ResourceOperations is mostly empty
+    //TEMP: | where (isnotempty(ExtensionType) or RolloutAction =~ "mdmhealthcheck")
+    | extend ResourceOperations = tolower(ResourceOperations)
+    | parse kind = regex ResourceOperations with * '"resourcename": "'ResourceName'"' 
+    | extend RolloutActionName = ResourceName
+            ,ExtensionType = tolower(ExtensionType)
+            ,ExtensionTypeRaw = ExtensionType
+    // Health Checks aren't that different from Extension in our current scenario
+    // of "are teams using them." So rather than have multiple entities, we're 
+    // keeping the RolloutActions through the query, even though most of the logic
+    // is parsing out ResourceOperations to get the needed details.
+	// For action item other than deploy, ResourceOperations is mostly empty
+    //TEMP: | where (isnotempty(ExtensionType) or RolloutAction =~ "mdmhealthcheck")
+    | project-away ResourceOperations
+    // presumably, EV2 data is at the Azure resource grain. This step just
+    // normalizes the data so that the grain is the same as DeploymentsExpressV2
+    | extend ActionStartedOn = todatetime(ActionStartedOn)
+            ,ActionCompletedOn = todatetime(ActionCompletedOn)
+    | summarize ActionStartedOn = min(ActionStartedOn)
+            , ActionCompletedOn = max(ActionCompletedOn)
+            by RolloutID
+            , Subscription
+            , Location
+            , RolloutActionName
+            , ExtensionType
+            , ExtensionTypeRaw
+            , RolloutAction
+			, HealthActionInfo
+    // Both Extension name and RolloutActions (excl. health checks) are expressed as
+    // a tuple separated by a forward slash. We're separating these so that we end
+    // up with a sort of dimension. This is especially important for RolloutActionType
+    // which gives us a small set of values with real scenario relevanece, namely
+    // "extension", "shell" and "mdmhealthcheck"
+	| extend HeathActionJson = parse_json(HealthActionInfo)
+    | extend ExtensionTypeDetail = extract(@'.*/([a-z\-]*)',1,ExtensionType)
+            ,ExtensionTypeFamily = coalesce(extract(@'(.*)/[a-z\-]*',1,ExtensionType),ExtensionType)
+            ,RolloutActionType = extract(@'(.*)/.*',1,RolloutActionName)
+            ,RolloutActionDetail = extract(@'.*/(.*)',1,RolloutActionName)
+			,HealthAccount = HeathActionJson.HealthAccount
+			,HealthEndpoint = HeathActionJson.HealthEndpoint
+			,HealthDimensionsType = HeathActionJson.HealthDimensionsType
+			,InitialWaitDurationInMinutes = HeathActionJson.InitialWaitDurationInMinutes
+			,MaxElasticDurationInMinutes = HeathActionJson.MaxElasticDurationInMinutes
+			,MonitorDurationInMinutes = HeathActionJson.MonitorDurationInMinutes
+			,HealthResources = HeathActionJson.HealthResources
+    // grab the ServiceOid just to make usage easier.
+    | join kind=leftouter 
+        cluster('genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_AzureSubscription_Snapshot 
+        on $left.Subscription == $right.SubscriptionId
+    // normalize the locations.
+    | join kind = leftouter 
+        (cluster('engpipe.kusto.windows.net').database('engpipe').fn_Insights_Release_AzureRegionsMapping
+        | where ReleaseSystem =~ "ev2")
+        on $left.Location == $right.ReleaseLocation
+    | project RolloutID
+            , Location
+            , LocationKey
+            , ServiceOid = ServiceId
+    // recombine MdmHealthCheck values with the simplified rollout actions e.g. extension and shell.
+            , RolloutAction = coalesce(RolloutActionType, tolower(RolloutAction))
+            , RolloutActionDetail
+            , ExtensionTypeFamily
+            , ExtensionTypeDetail
+            , ActionStartedOn
+            , ActionCompletedOn
+            , ExtensionTypeRaw
+            , RolloutActionRaw = RolloutAction
+            , RowInsertedDate = now()
+			, HealthAccount
+			, HealthEndpoint
+			, HealthDimensionsType
+			, InitialWaitDurationInMinutes
+			, MaxElasticDurationInMinutes
+			, MonitorDurationInMinutes
+			, HealthResources
+;
+} 

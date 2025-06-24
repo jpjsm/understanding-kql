@@ -1,0 +1,58 @@
+let GenevaReference_SubscriptionIds = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_AzureSubscription_Snapshot
+| project SubscriptionId
+| distinct SubscriptionId;
+let Lens_SubscriptionIds = cluster('lens').database('Shared').ServiceTree_AIRSSubscriptionFeedV1
+| project SubscriptionId
+| distinct SubscriptionId;
+let GenevaReference_ServiceIds = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_AzureSubscription_Snapshot
+| project ServiceId
+| distinct ServiceId;
+let Lens_ServiceIds = cluster('lens').database('Shared').ServiceTree_AIRSSubscriptionFeedV1
+| project ServiceId = ServiceOid
+| distinct ServiceId;
+let GenevaReference_ServiceSubscriptionIds = cluster('https://genevareference.westcentralus.kusto.windows.net').database('Shared').DataStudio_ServiceTree_AzureSubscription_Snapshot
+| project ServiceId, SubscriptionId
+| distinct ServiceId, SubscriptionId;
+let Lens_ServiceSubscriptionIds = cluster('lens').database('Shared').ServiceTree_AIRSSubscriptionFeedV1
+| project ServiceId = ServiceOid, SubscriptionId
+| distinct ServiceId, SubscriptionId;
+let SubscriptionInfo = GenevaReference_SubscriptionIds
+| join kind = inner ( Lens_SubscriptionIds ) on SubscriptionId
+|summarize SubscriptionTotal = count()
+|extend Group = 'Full match'
+|union (GenevaReference_SubscriptionIds
+| join kind = leftanti  ( Lens_SubscriptionIds ) on SubscriptionId
+|summarize SubscriptionTotal = count()
+|extend Group = 'GenevaReference only')
+|union (GenevaReference_SubscriptionIds
+| join kind = rightanti   ( Lens_SubscriptionIds ) on SubscriptionId
+|summarize SubscriptionTotal = count()
+|extend Group = 'Lens only');
+let ServiceInfo = GenevaReference_ServiceIds
+| join kind = inner ( Lens_ServiceIds ) on ServiceId
+|summarize ServiceTotal = count()
+|extend Group = 'Full match'
+|union (GenevaReference_ServiceIds
+| join kind = leftanti  ( Lens_ServiceIds ) on ServiceId
+|summarize ServiceTotal = count()
+|extend Group = 'GenevaReference only')
+|union (GenevaReference_ServiceIds
+| join kind = rightanti   ( Lens_ServiceIds ) on ServiceId
+|summarize ServiceTotal = count()
+|extend Group = 'Lens only');
+let ServiceSubscriptionInfo = GenevaReference_ServiceSubscriptionIds
+| join kind = inner ( Lens_ServiceSubscriptionIds ) on ServiceId, SubscriptionId 
+|summarize ServiceSubscriptionTotal = count()
+|extend Group = 'Full match'
+|union (GenevaReference_ServiceSubscriptionIds
+| join kind = leftanti  ( Lens_ServiceSubscriptionIds ) on ServiceId, SubscriptionId
+|summarize ServiceSubscriptionTotal = count()
+|extend Group = 'GenevaReference only')
+|union (GenevaReference_ServiceSubscriptionIds
+| join kind = rightanti   ( Lens_ServiceSubscriptionIds ) on ServiceId, SubscriptionId
+|summarize ServiceSubscriptionTotal = count()
+|extend Group = 'Lens only');
+SubscriptionInfo 
+| join kind = inner (ServiceInfo) on Group
+| join kind = inner ServiceSubscriptionInfo on Group
+| project Group, SubscriptionTotal, ServiceTotal,ServiceSubscriptionTotal;
